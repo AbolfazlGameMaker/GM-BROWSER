@@ -1,298 +1,185 @@
-import sys
-import os
-import json
+import sys, os, json
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLineEdit, QToolBar, QTabWidget, 
-    QWidget, QVBoxLayout, QDialog, QPushButton, 
-    QLabel, QMessageBox, QListWidget, QHBoxLayout, QInputDialog, QRadioButton, QButtonGroup, QListWidgetItem
+    QWidget, QVBoxLayout, QDialog, QPushButton, QLabel, 
+    QRadioButton, QFrame, QListWidget, QMessageBox, QHBoxLayout
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
-from PySide6.QtCore import QUrl, Qt, QSize
-from PySide6.QtGui import QColor
-
-# Performance and UI Stability Optimization
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
-    "--enable-gpu-rasterization --ignore-gpu-blocklist "
-    "--disable-features=SurfaceControl --mute-audio"
-)
-
-class GMBROWSER(QMainWindow):
+from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtGui import QColor, QKeyEvent
+from PySide6.QtCore import QUrl, Qt
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--ignore-gpu-blocklist --no-sandbox"
+STYLE = """
+QMainWindow { background-color: #050505; }
+QToolBar { background: #080808; border-bottom: 1px solid #1a1a1a; padding: 5px; spacing: 10px; }
+QLineEdit { background: #111; color: #00f2ff; border: 1px solid #222; padding: 7px 15px; border-radius: 20px; font-size: 13px; }
+QPushButton { background: transparent; color: #777; font-size: 14px; padding: 5px; font-weight: bold; border-radius: 5px; }
+QPushButton:hover { color: #00f2ff; background: #1a1a1a; }
+#HomeBtn { color: #00f2ff; font-size: 16px; }
+QTabWidget::pane { border: none; }
+QTabBar::tab { background: #080808; color: #444; padding: 10px 25px; border-right: 1px solid #111; }
+QTabBar::tab:selected { background: #111; color: #00f2ff; border-top: 2px solid #00f2ff; }
+QDialog { background: #080808; border: 1px solid #333; color: white; }
+QListWidget { background: #0a0a0a; color: #eee; border: 1px solid #222; border-radius: 5px; padding: 5px; }
+"""
+class GMBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GM-BROWSER")
-        self.resize(1300, 900)
-        
-        self.db_path = "gm_database_v3.json"
-        self.load_data()
-
-        self.setStyleSheet("""
-            QMainWindow { background: #050505; }
-            QToolBar { background: #0a0a0a; border-bottom: 1px solid #1a1a1a; padding: 10px; spacing: 8px; }
-            QLineEdit { background: #151515; color: #00f2ff; border: 1px solid #333; border-radius: 15px; padding: 8px 18px; font-size: 13px; }
-            QTabWidget::pane { border: none; background: #050505; }
-            QTabBar::tab { background: #0a0a0a; color: #888; padding: 12px 25px; border: 1px solid #1a1a1a; margin-right: 2px; }
-            QTabBar::tab:selected { background: #111; color: #00f2ff; border: 1px solid #00f2ff; }
-            QPushButton { background: #111; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 8px 15px; font-weight: bold; }
-            QPushButton:hover { border-color: #00f2ff; color: #00f2ff; }
-            QListWidget { background: #0a0a0a; color: #00f2ff; border: 1px solid #333; padding: 5px; }
-            QListWidget::item { padding: 10px; border-bottom: 1px solid #1a1a1a; }
-        """)
-
-        self.home_url = QUrl.fromLocalFile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "home.html"))
+        self.resize(1200, 800)
+        self.setStyleSheet(STYLE)
+        self.safe_mode = "active" 
+        self.is_fullscreen = False
+        self.home_url = QUrl.fromLocalFile(os.path.abspath("home.html"))
+        self.bookmarks = self.load_data("bookmarks.json")
+        self.history = self.load_data("history.json")
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
-        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.tabCloseRequested.connect(lambda i: self.tabs.removeTab(i) if self.tabs.count() > 1 else None)
         self.setCentralWidget(self.tabs)
-
-        self.create_nav()
-        self.add_tab(self.home_url, "Home")
-
-    def load_data(self):
-        default_data = {"history": [], "bookmarks": [], "password": "", "safesearch": "active"}
-        if os.path.exists(self.db_path):
+        self.setup_ui()
+        self.add_new_tab(self.home_url, "GM-BROWSER")
+    def load_data(self, filename):
+        if os.path.exists(filename):
             try:
-                with open(self.db_path, 'r', encoding='utf-8') as f:
-                    self.data = json.load(f)
-            except: self.data = default_data
-        else: self.data = default_data
-        
-        self.history = self.data.get("history", [])
-        self.bookmarks = self.data.get("bookmarks", [])
-        self.app_password = self.data.get("password", "")
-        self.safesearch_mode = self.data.get("safesearch", "active")
-
-    def save_data(self):
-        self.data = {
-            "history": self.history,
-            "bookmarks": self.bookmarks,
-            "password": self.app_password,
-            "safesearch": self.safesearch_mode
-        }
-        with open(self.db_path, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, ensure_ascii=False)
-
-    def create_nav(self):
-        nav_bar = QToolBar()
-        self.addToolBar(nav_bar)
-
-        nav_bar.addAction(" ❮ ", self.back)
-        nav_bar.addAction(" ❯ ", self.forward)
-        nav_bar.addAction(" ↻ ", self.reload)
-        nav_bar.addAction(" 🏠 ", self.go_home)
-
+                with open(filename, 'r') as f: return json.load(f)
+            except: return []
+        return []
+    def save_data(self, filename, data):
+        with open(filename, 'w') as f: json.dump(data, f)
+    def setup_ui(self):
+        self.toolbar = QToolBar()
+        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
+        self.toolbar.setMovable(False)
+        btn_home = self.create_nav_btn("🏠", self.go_home)
+        btn_home.setObjectName("HomeBtn")
+        self.toolbar.addWidget(btn_home)
+        self.toolbar.addWidget(self.create_nav_btn("❮", lambda: self.tabs.currentWidget().back()))
+        self.toolbar.addWidget(self.create_nav_btn("❯", lambda: self.tabs.currentWidget().forward()))
+        self.toolbar.addWidget(self.create_nav_btn("↻", lambda: self.tabs.currentWidget().reload()))
         self.url_bar = QLineEdit()
-        self.url_bar.setPlaceholderText("Search or enter URL...")
-        self.url_bar.returnPressed.connect(self.navigate_to_url)
-        nav_bar.addWidget(self.url_bar)
-
-        nav_bar.addAction(" ⭐ ", self.manage_bookmarks)
-        nav_bar.addAction(" 📖 ", self.manage_history)
-        nav_bar.addAction(" ⚙️ ", self.open_settings)
-        nav_bar.addAction(" ＋ ", lambda: self.add_tab(self.home_url, "New Tab"))
-
-    def add_tab(self, url, title):
+        self.url_bar.setPlaceholderText("Search with GM-BROWSER...")
+        self.url_bar.returnPressed.connect(self.navigate)
+        self.toolbar.addWidget(self.url_bar)
+        self.toolbar.addWidget(self.create_nav_btn("⭐", self.add_bookmark))
+        self.toolbar.addWidget(self.create_nav_btn("📜", self.show_history_dialog))
+        self.toolbar.addWidget(self.create_nav_btn("📂", self.show_bookmarks_dialog))
+        self.toolbar.addWidget(self.create_nav_btn("➕", lambda: self.add_new_tab(self.home_url, "New Tab")))
+        self.toolbar.addWidget(self.create_nav_btn("⚙️", self.open_settings))
+    def create_nav_btn(self, text, slot):
+        btn = QPushButton(text)
+        btn.clicked.connect(slot)
+        return btn
+    def go_home(self):
+        self.tabs.currentWidget().setUrl(self.home_url)
+    def add_new_tab(self, qurl, title):
         browser = QWebEngineView()
-        browser.page().setBackgroundColor(QColor("#050505"))
-        browser.setUrl(url)
+        browser.settings().setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
+        browser.setUrl(qurl)
         idx = self.tabs.addTab(browser, title)
         self.tabs.setCurrentIndex(idx)
-        browser.urlChanged.connect(lambda q, b=browser: self.update_url(q, b))
-        browser.loadFinished.connect(lambda _, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), b.page().title()[:12]))
-
-    def navigate_to_url(self):
+        browser.urlChanged.connect(lambda q: self.handle_url_change(q, browser))
+        browser.titleChanged.connect(lambda t: self.tabs.setTabText(self.tabs.indexOf(browser), t[:15]))
+    def handle_url_change(self, q, browser):
+        url_str = q.toString()
+        if "home.html" not in url_str:
+            self.url_bar.setText(url_str)
+            if not self.history or self.history[-1]['url'] != url_str:
+                self.history.append({"title": browser.title() or "Page", "url": url_str})
+                self.save_data("history.json", self.history)
+        else: self.url_bar.clear()
+    def navigate(self):
         text = self.url_bar.text().strip()
         if not text: return
         if "." in text and " " not in text:
-            url = QUrl(text if "://" in text else "https://" + text)
-        else:
-            url = QUrl(f"https://www.google.com/search?q={text}&safe={self.safesearch_mode}")
-        self.tabs.currentWidget().setUrl(url)
-
-    def update_url(self, q, browser):
-        if browser == self.tabs.currentWidget():
-            u = q.toString()
-            self.url_bar.setText("" if "home.html" in u else u)
-            if u.startswith("http") and "google.com/search" not in u:
-                if not self.history or self.history[-1]['url'] != u:
-                    self.history.append({"title": browser.page().title(), "url": u})
-                    self.save_data()
-
-    def manage_bookmarks(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Bookmarks Manager")
-        dlg.setMinimumSize(450, 550)
-        layout = QVBoxLayout(dlg)
-        
-        list_w = QListWidget()
-        def reload_list():
-            list_w.clear()
-            for b in reversed(self.bookmarks): list_w.addItem(f"{b['title']} | {b['url']}")
-        
-        reload_list()
-        
-        btns = QHBoxLayout()
-        add_btn = QPushButton("Save Current Page")
-        del_btn = QPushButton("Delete Selected")
-        clear_btn = QPushButton("Clear All")
-        
-        add_btn.clicked.connect(lambda: self.add_bookmark_logic(reload_list))
-        del_btn.clicked.connect(lambda: self.delete_bookmark_logic(list_w, reload_list))
-        clear_btn.clicked.connect(lambda: self.clear_bookmarks_logic(reload_list))
-        
-        list_w.itemDoubleClicked.connect(lambda i: [self.add_tab(QUrl(i.text().split(" | ")[-1]), "Loading..."), dlg.accept()])
-
-        btns.addWidget(add_btn); btns.addWidget(del_btn); btns.addWidget(clear_btn)
-        layout.addWidget(list_w); layout.addLayout(btns)
-        dlg.exec()
-
-    def add_bookmark_logic(self, callback):
-        b = self.tabs.currentWidget()
-        url = b.url().toString()
+            url = text if "://" in text else "https://" + text
+        else: url = f"https://www.google.com/search?q={text}&safe={self.safe_mode}"
+        self.tabs.currentWidget().setUrl(QUrl(url))
+    def add_bookmark(self):
+        curr = self.tabs.currentWidget()
+        url = curr.url().toString()
         if "home.html" not in url:
-            self.bookmarks.append({"title": b.page().title(), "url": url})
-            self.save_data(); callback()
-
-    def delete_bookmark_logic(self, list_w, callback):
-        for item in list_w.selectedItems():
-            url = item.text().split(" | ")[-1]
-            self.bookmarks = [b for b in self.bookmarks if b['url'] != url]
-        self.save_data(); callback()
-
-    def clear_bookmarks_logic(self, callback):
-        if QMessageBox.question(self, "Clear", "Clear all bookmarks?") == QMessageBox.Yes:
-            self.bookmarks = []; self.save_data(); callback()
-
-    def manage_history(self):
+            if not any(b['url'] == url for b in self.bookmarks):
+                self.bookmarks.append({"title": curr.title() or "Page", "url": url})
+                self.save_data("bookmarks.json", self.bookmarks)
+                QMessageBox.information(self, "GM-BROWSER", "Site saved to bookmarks.")
+    def show_bookmarks_dialog(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("History Manager")
-        dlg.setMinimumSize(450, 550)
+        dlg.setWindowTitle("GM-BROWSER Bookmarks")
+        dlg.setFixedSize(450, 500)
         layout = QVBoxLayout(dlg)
         list_w = QListWidget()
-        
-        def reload_list():
-            list_w.clear()
-            for h in reversed(self.history): list_w.addItem(f"{h['title']} | {h['url']}")
-        
-        reload_list()
-        
+        for b in self.bookmarks: list_w.addItem(f"{b['title']} -> {b['url']}")
+        layout.addWidget(list_w)
         btns = QHBoxLayout()
-        del_btn = QPushButton("Delete Selected")
-        clear_btn = QPushButton("Clear All History")
-        
-        del_btn.clicked.connect(lambda: self.delete_history_logic(list_w, reload_list))
-        clear_btn.clicked.connect(lambda: self.clear_history_logic(reload_list))
-        
-        list_w.itemDoubleClicked.connect(lambda i: [self.add_tab(QUrl(i.text().split(" | ")[-1]), "Loading..."), dlg.accept()])
-
-        btns.addWidget(del_btn); btns.addWidget(clear_btn)
-        layout.addWidget(list_w); layout.addLayout(btns)
+        btn_open = QPushButton("Launch Site")
+        btn_del = QPushButton("Delete Bookmark")
+        btn_open.clicked.connect(lambda: self.open_bm(list_w, dlg))
+        btn_del.clicked.connect(lambda: self.delete_bm(list_w))
+        btns.addWidget(btn_open); btns.addWidget(btn_del)
+        layout.addLayout(btns)
         dlg.exec()
-
-    def delete_history_logic(self, list_w, callback):
-        for item in list_w.selectedItems():
-            url = item.text().split(" | ")[-1]
-            self.history = [h for h in self.history if h['url'] != url]
-        self.save_data(); callback()
-
-    def clear_history_logic(self, callback):
-        if QMessageBox.question(self, "Clear", "Clear all browsing history?") == QMessageBox.Yes:
-            self.history = []; self.save_data(); callback()
-
+    def open_bm(self, list_w, dlg):
+        if list_w.currentItem():
+            url = list_w.currentItem().text().split(" -> ")[-1]
+            self.tabs.currentWidget().setUrl(QUrl(url))
+            dlg.accept()
+    def delete_bm(self, list_w):
+        row = list_w.currentRow()
+        if row >= 0:
+            self.bookmarks.pop(row)
+            self.save_data("bookmarks.json", self.bookmarks)
+            list_w.takeItem(row)
+    def show_history_dialog(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("GM-BROWSER History")
+        dlg.setFixedSize(500, 500)
+        layout = QVBoxLayout(dlg)
+        list_w = QListWidget()
+        for h in reversed(self.history): list_w.addItem(h['url'])
+        layout.addWidget(list_w)
+        btn_clear = QPushButton("Clear All History")
+        btn_clear.clicked.connect(lambda: [self.history.clear(), self.save_data("history.json", []), list_w.clear()])
+        layout.addWidget(btn_clear)
+        list_w.itemDoubleClicked.connect(lambda it: [self.tabs.currentWidget().setUrl(QUrl(it.text())), dlg.accept()])
+        dlg.exec()
     def open_settings(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Settings")
-        dlg.setFixedSize(400, 480)
+        dlg.setWindowTitle("GM-BROWSER Engine Settings")
+        dlg.setFixedSize(450, 350)
         layout = QVBoxLayout(dlg)
-
-        layout.addWidget(QLabel("🔒 SECURITY ACCESS"))
-        p_btn = QPushButton("Set Password")
-        p_btn.clicked.connect(self.set_pwd)
-        r_btn = QPushButton("Remove Password")
-        r_btn.clicked.connect(self.rem_pwd)
-        layout.addWidget(p_btn); layout.addWidget(r_btn)
-
-        layout.addWidget(QLabel("\n🛡 GOOGLE SAFESEARCH"))
-        group = QButtonGroup(dlg)
-        r1 = QRadioButton("Filter (Strict Content)"); r2 = QRadioButton("Blur (Blur Sensitive)"); r3 = QRadioButton("Off (No Filtering)")
-        group.addButton(r1); group.addButton(r2); group.addButton(r3)
-        
-        if self.safesearch_mode == "active": r1.setChecked(True)
-        elif self.safesearch_mode == "images": r2.setChecked(True)
-        else: r3.setChecked(True)
-        
-        layout.addWidget(r1); layout.addWidget(r2); layout.addWidget(r3)
-        
-        save = QPushButton("APPLY ALL SETTINGS")
-        save.setStyleSheet("background: #00f2ff; color: #000;")
-        save.clicked.connect(lambda: self.apply_set(dlg, r1, r2, r3))
-        layout.addWidget(save)
+        frame = QFrame()
+        frame.setStyleSheet("background: #001a1a; border: 1px solid #00f2ff; border-radius: 10px; padding: 15px;")
+        f_layout = QVBoxLayout(frame)
+        rec = QLabel("💎 DEVELOPER TIP:\nSafeSearch ensures a professional experience with GM-BROWSER.")
+        rec.setWordWrap(True)
+        rec.setStyleSheet("color: #00f2ff; font-weight: bold; font-size: 13px; border: none;")
+        f_layout.addWidget(rec)
+        layout.addWidget(frame)
+        self.r_off = QRadioButton("SafeSearch: Off")
+        self.r_blur = QRadioButton("SafeSearch: Blur")
+        self.r_filter = QRadioButton("SafeSearch: Filter (Strict)")
+        for r in [self.r_off, self.r_blur, self.r_filter]: layout.addWidget(r)
+        if self.safe_mode == "off": self.r_off.setChecked(True)
+        elif self.safe_mode == "blur": self.r_blur.setChecked(True)
+        else: self.r_filter.setChecked(True)
+        btn_apply = QPushButton("Apply Configuration")
+        btn_apply.setStyleSheet("background: #00f2ff; color: black; padding: 12px; font-weight: bold;")
+        btn_apply.clicked.connect(lambda: self.apply_settings(dlg))
+        layout.addWidget(btn_apply)
         dlg.exec()
-
-    def apply_set(self, dlg, r1, r2, r3):
-        if r1.isChecked(): self.safesearch_mode = "active"
-        elif r2.isChecked(): self.safesearch_mode = "images"
-        else: self.safesearch_mode = "off"
-        self.save_data(); dlg.accept()
-
-    def set_pwd(self):
-        p, ok = QInputDialog.getText(self, "Security", "Set New Password:", QLineEdit.Password)
-        if ok and p: self.app_password = p; self.save_data()
-
-    def rem_pwd(self): self.app_password = ""; self.save_data()
-
-    def close_tab(self, i):
-        if self.tabs.count() > 1: self.tabs.removeTab(i)
-        else: self.go_home()
-
-    def back(self): self.tabs.currentWidget().back()
-    def forward(self): self.tabs.currentWidget().forward()
-    def reload(self): self.tabs.currentWidget().reload()
-    def go_home(self): self.tabs.currentWidget().setUrl(self.home_url)
-
-class LoginDialog(QDialog):
-    def __init__(self, pwd):
-        super().__init__()
-        self.pwd = pwd
-        self.setWindowTitle("Security Lock")
-        self.setFixedSize(320, 160)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setStyleSheet("background: #050505; border: 2px solid #00f2ff; border-radius: 10px;")
-        l = QVBoxLayout(self)
-        title = QLabel("LOCKED: ACCESS DENIED")
-        title.setStyleSheet("color: #00f2ff; font-weight: bold; border: none;")
-        title.setAlignment(Qt.AlignCenter)
-        l.addWidget(title)
-        self.inp = QLineEdit()
-        self.inp.setEchoMode(QLineEdit.Password)
-        self.inp.setPlaceholderText("Enter Key to Unlock...")
-        self.inp.setStyleSheet("padding: 8px; color: white; background: #111; border: 1px solid #333;")
-        l.addWidget(self.inp)
-        b = QPushButton("UNLOCK BROWSER")
-        b.clicked.connect(self.check)
-        b.setStyleSheet("background: #00f2ff; color: #000; font-weight: bold;")
-        l.addWidget(b)
-
-    def check(self):
-        if self.inp.text() == self.pwd: self.accept()
-        else: QMessageBox.critical(self, "Denied", "Incorrect Password!")
-
+    def apply_settings(self, dlg):
+        if self.r_off.isChecked(): self.safe_mode = "off"
+        elif self.r_blur.isChecked(): self.safe_mode = "blur"
+        else: self.safe_mode = "active"
+        dlg.accept()
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key_F11:
+            if self.is_fullscreen: self.showNormal()
+            else: self.showFullScreen()
+            self.is_fullscreen = not self.is_fullscreen
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Load Security State
-    temp_data = {}
-    if os.path.exists("gm_database_v3.json"):
-        with open("gm_database_v3.json", 'r') as f:
-            try: temp_data = json.load(f)
-            except: pass
-    
-    pwd = temp_data.get("password", "")
-    if pwd:
-        login = LoginDialog(pwd)
-        if login.exec() != QDialog.Accepted: sys.exit()
-    
-    window = GMBROWSER()
+    window = GMBrowser()
     window.show()
     sys.exit(app.exec())
-    
