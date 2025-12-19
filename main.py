@@ -2,256 +2,297 @@ import sys
 import os
 import json
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QLineEdit, QToolBar,
-    QTabWidget, QWidget, QVBoxLayout, QHBoxLayout, QDialog, 
-    QPushButton, QLabel, QListWidget, QMessageBox, QFileDialog, 
-    QComboBox, QFrame
+    QApplication, QMainWindow, QLineEdit, QToolBar, QTabWidget, 
+    QWidget, QVBoxLayout, QDialog, QPushButton, 
+    QLabel, QMessageBox, QListWidget, QHBoxLayout, QInputDialog, QRadioButton, QButtonGroup, QListWidgetItem
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
-from PySide6.QtGui import QAction
 from PySide6.QtCore import QUrl, Qt, QSize
+from PySide6.QtGui import QColor
 
-# فایل‌های ذخیره داده
-DOWNLOADS_LOG = "downloads.json"
-HISTORY_FILE = "history.json"
-BOOKMARKS_FILE = "bookmarks.json"
-
-# --- افزایش سرعت با تنظیمات موتور کرومیوم و GPU ---
+# Performance and UI Stability Optimization
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
-    "--ignore-certificate-errors "
-    "--log-level=3 "
-    "--enable-gpu-rasterization "
-    "--enable-zero-copy "
-    "--disable-software-rasterizer "
-    "--ignore-gpu-blocklist "
-    "--num-raster-threads=4"
+    "--enable-gpu-rasterization --ignore-gpu-blocklist "
+    "--disable-features=SurfaceControl --mute-audio"
 )
 
-# --- استایل نئونی ---
-UI_STYLE = """
-QMainWindow { background-color: #080a0f; }
-QTabWidget::pane { border: none; background-color: #080a0f; }
-QTabBar::tab {
-    background: #141721; color: #888; padding: 12px 25px;
-    border-top-left-radius: 15px; border-top-right-radius: 15px;
-    margin-right: 3px; font-weight: 600;
-}
-QTabBar::tab:selected { background: #1c1f2b; color: #00ffff; border-bottom: 3px solid #00ffff; }
-QToolBar { background: #141721; border-bottom: 1px solid #222; padding: 8px; spacing: 12px; }
-QLineEdit {
-    background: #1c1f2b; color: white; border: 1px solid #333;
-    border-radius: 22px; padding: 10px 20px; font-size: 14px;
-}
-QLineEdit:focus { border: 1px solid #00ffff; background: #222636; }
-QDialog { background-color: #0d1117; border-radius: 20px; }
-QListWidget { background-color: #141721; color: white; border: 1px solid #333; border-radius: 15px; padding: 10px; }
-QPushButton { 
-    background-color: #1c1f2b; color: white; border-radius: 12px; 
-    padding: 10px 18px; font-weight: bold; border: 1px solid #333;
-}
-QPushButton:hover { background-color: #282c3d; border-color: #00ffff; }
-QPushButton#Danger { background-color: rgba(255, 77, 77, 0.1); color: #ff4d4d; border: 1px solid #ff4d4d; }
-QPushButton#Danger:hover { background-color: #ff4d4d; color: white; }
-QPushButton#SafeActive { background-color: rgba(0, 255, 255, 0.1); color: #00ffff; border: 1px solid #00ffff; }
-"""
-
-class ListManagerDialog(QDialog):
-    def __init__(self, title, items, storage_file, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title); self.setFixedSize(500, 600); self.setStyleSheet(UI_STYLE)
-        self.items = items; self.storage_file = storage_file; self.action_type = None
-        
-        layout = QVBoxLayout(self)
-        self.list_widget = QListWidget(); self.refresh_ui()
-        layout.addWidget(self.list_widget)
-        
-        btn_layout = QHBoxLayout()
-        open_btn = QPushButton("Open"); open_btn.clicked.connect(self.handle_open)
-        del_btn = QPushButton("Delete"); del_btn.setObjectName("Danger"); del_btn.clicked.connect(self.handle_delete)
-        clear_btn = QPushButton("Clear All"); clear_btn.setObjectName("Danger"); clear_btn.clicked.connect(self.handle_clear_all)
-        
-        btn_layout.addWidget(open_btn); btn_layout.addWidget(del_btn); btn_layout.addWidget(clear_btn)
-        layout.addLayout(btn_layout)
-
-    def refresh_ui(self):
-        self.list_widget.clear()
-        for item in reversed(self.items):
-            self.list_widget.addItem(f"{item['title']}\n{item['url']}")
-
-    def handle_open(self):
-        if self.list_widget.currentRow() != -1:
-            self.action_type = "open"; self.accept()
-
-    def handle_delete(self):
-        row = self.list_widget.currentRow()
-        if row != -1:
-            index_to_del = len(self.items) - 1 - row
-            del self.items[index_to_del]; self.save_to_disk(); self.refresh_ui()
-
-    def handle_clear_all(self):
-        if QMessageBox.question(self, "Confirm", "Delete everything?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
-            self.items.clear(); self.save_to_disk(); self.refresh_ui()
-
-    def save_to_disk(self):
-        with open(self.storage_file, "w", encoding="utf-8") as f:
-            json.dump(self.items, f, indent=4)
-
-class SettingsDialog(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.parent = parent
-        self.setWindowTitle("Settings"); self.setFixedSize(400, 450); self.setStyleSheet(UI_STYLE)
-        layout = QVBoxLayout(self); layout.setContentsMargins(30, 30, 30, 30)
-        
-        layout.addWidget(QLabel("🛡 GOOGLE SAFESEARCH MODE"))
-        safe_layout = QHBoxLayout()
-        self.btn_f = QPushButton("Filter"); self.btn_b = QPushButton("Blur"); self.btn_o = QPushButton("Off")
-        for b in [self.btn_f, self.btn_b, self.btn_o]: safe_layout.addWidget(b)
-        layout.addLayout(safe_layout)
-        
-        self.btn_f.clicked.connect(lambda: self.set_s("active"))
-        self.btn_b.clicked.connect(lambda: self.set_s("images"))
-        self.btn_o.clicked.connect(lambda: self.set_s("off"))
-        self.update_btns()
-        layout.addStretch()
-        done = QPushButton("Done"); done.setStyleSheet("background:#00ffff; color:#000;"); done.clicked.connect(self.accept)
-        layout.addWidget(done)
-
-    def set_s(self, m):
-        self.parent.safe_mode = m; self.update_btns()
-
-    def update_btns(self):
-        m = self.parent.safe_mode
-        self.btn_f.setObjectName("SafeActive" if m == "active" else "")
-        self.btn_b.setObjectName("SafeActive" if m == "images" else "")
-        self.btn_o.setObjectName("SafeActive" if m == "off" else "")
-        self.setStyleSheet(UI_STYLE)
-
-class AdvancedBrowser(QMainWindow):
+class GMBROWSER(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("GM-BROWSER"); self.resize(1280, 850); self.setStyleSheet(UI_STYLE)
+        self.setWindowTitle("GM-BROWSER")
+        self.resize(1300, 900)
         
-        self.history = self.load_json(HISTORY_FILE, [])
-        self.bookmarks = self.load_json(BOOKMARKS_FILE, [])
-        self.safe_mode = "active"
-        
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        self.home_url = QUrl.fromLocalFile(os.path.join(base_path, "home.html"))
+        self.db_path = "gm_database_v3.json"
+        self.load_data()
 
-        self.tabs = QTabWidget(); self.tabs.setTabsClosable(True)
+        self.setStyleSheet("""
+            QMainWindow { background: #050505; }
+            QToolBar { background: #0a0a0a; border-bottom: 1px solid #1a1a1a; padding: 10px; spacing: 8px; }
+            QLineEdit { background: #151515; color: #00f2ff; border: 1px solid #333; border-radius: 15px; padding: 8px 18px; font-size: 13px; }
+            QTabWidget::pane { border: none; background: #050505; }
+            QTabBar::tab { background: #0a0a0a; color: #888; padding: 12px 25px; border: 1px solid #1a1a1a; margin-right: 2px; }
+            QTabBar::tab:selected { background: #111; color: #00f2ff; border: 1px solid #00f2ff; }
+            QPushButton { background: #111; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 8px 15px; font-weight: bold; }
+            QPushButton:hover { border-color: #00f2ff; color: #00f2ff; }
+            QListWidget { background: #0a0a0a; color: #00f2ff; border: 1px solid #333; padding: 5px; }
+            QListWidget::item { padding: 10px; border-bottom: 1px solid #1a1a1a; }
+        """)
+
+        self.home_url = QUrl.fromLocalFile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "home.html"))
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.setCentralWidget(self.tabs)
 
-        self.create_toolbar()
+        self.create_nav()
         self.add_tab(self.home_url, "Home")
 
-    def create_toolbar(self):
-        bar = QToolBar(); bar.setMovable(False); self.addToolBar(bar)
-        acts = [(" ❮ ", self.current_back), (" ❯ ", self.current_forward), 
-                (" ↻ ", self.current_reload), (" 🏠 ", self.go_home)]
-        for t, c in acts:
-            a = QAction(t, self); a.triggered.connect(c); bar.addAction(a)
+    def load_data(self):
+        default_data = {"history": [], "bookmarks": [], "password": "", "safesearch": "active"}
+        if os.path.exists(self.db_path):
+            try:
+                with open(self.db_path, 'r', encoding='utf-8') as f:
+                    self.data = json.load(f)
+            except: self.data = default_data
+        else: self.data = default_data
+        
+        self.history = self.data.get("history", [])
+        self.bookmarks = self.data.get("bookmarks", [])
+        self.app_password = self.data.get("password", "")
+        self.safesearch_mode = self.data.get("safesearch", "active")
 
-        self.url_bar = QLineEdit(); self.url_bar.returnPressed.connect(self.navigate); bar.addWidget(self.url_bar)
-        bar.addAction(QAction(" ⭐ ", self, triggered=self.add_bookmark))
-        bar.addAction(QAction(" 📖 ", self, triggered=self.show_bookmarks))
-        bar.addAction(QAction(" 🕒 ", self, triggered=self.show_history))
-        bar.addAction(QAction(" ➕ ", self, triggered=lambda: self.add_tab(self.home_url, "New Tab")))
-        bar.addAction(QAction(" ⚙️ ", self, triggered=lambda: SettingsDialog(self).exec()))
+    def save_data(self):
+        self.data = {
+            "history": self.history,
+            "bookmarks": self.bookmarks,
+            "password": self.app_password,
+            "safesearch": self.safesearch_mode
+        }
+        with open(self.db_path, 'w', encoding='utf-8') as f:
+            json.dump(self.data, f, ensure_ascii=False)
 
-    # --- توابع مدیریت تاریخچه و بوکمارک که ارور می‌دادند ---
-    def show_history(self):
-        dialog = ListManagerDialog("Browsing History", self.history, HISTORY_FILE, self)
-        if dialog.exec() and dialog.action_type == "open":
-            row = dialog.list_widget.currentRow()
-            self.current().setUrl(QUrl(self.history[len(self.history)-1-row]['url']))
+    def create_nav(self):
+        nav_bar = QToolBar()
+        self.addToolBar(nav_bar)
 
-    def show_bookmarks(self):
-        dialog = ListManagerDialog("Bookmarks", self.bookmarks, BOOKMARKS_FILE, self)
-        if dialog.exec() and dialog.action_type == "open":
-            row = dialog.list_widget.currentRow()
-            self.current().setUrl(QUrl(self.bookmarks[len(self.bookmarks)-1-row]['url']))
+        nav_bar.addAction(" ❮ ", self.back)
+        nav_bar.addAction(" ❯ ", self.forward)
+        nav_bar.addAction(" ↻ ", self.reload)
+        nav_bar.addAction(" 🏠 ", self.go_home)
 
-    def navigate(self):
+        self.url_bar = QLineEdit()
+        self.url_bar.setPlaceholderText("Search or enter URL...")
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
+        nav_bar.addWidget(self.url_bar)
+
+        nav_bar.addAction(" ⭐ ", self.manage_bookmarks)
+        nav_bar.addAction(" 📖 ", self.manage_history)
+        nav_bar.addAction(" ⚙️ ", self.open_settings)
+        nav_bar.addAction(" ＋ ", lambda: self.add_tab(self.home_url, "New Tab"))
+
+    def add_tab(self, url, title):
+        browser = QWebEngineView()
+        browser.page().setBackgroundColor(QColor("#050505"))
+        browser.setUrl(url)
+        idx = self.tabs.addTab(browser, title)
+        self.tabs.setCurrentIndex(idx)
+        browser.urlChanged.connect(lambda q, b=browser: self.update_url(q, b))
+        browser.loadFinished.connect(lambda _, b=browser: self.tabs.setTabText(self.tabs.indexOf(b), b.page().title()[:12]))
+
+    def navigate_to_url(self):
         text = self.url_bar.text().strip()
         if not text: return
         if "." in text and " " not in text:
-            url = QUrl(text)
+            url = QUrl(text if "://" in text else "https://" + text)
         else:
-            url = QUrl(f"https://www.google.com/search?q={text.replace(' ', '+')}&safe={self.safe_mode}")
-        if url.scheme() == "": url.setScheme("https")
-        self.current().setUrl(url)
+            url = QUrl(f"https://www.google.com/search?q={text}&safe={self.safesearch_mode}")
+        self.tabs.currentWidget().setUrl(url)
 
-    def add_tab(self, url, title):
-        web = QWebEngineView()
-        s = web.settings()
-        s.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
-        s.setAttribute(QWebEngineSettings.WebGLEnabled, True)
+    def update_url(self, q, browser):
+        if browser == self.tabs.currentWidget():
+            u = q.toString()
+            self.url_bar.setText("" if "home.html" in u else u)
+            if u.startswith("http") and "google.com/search" not in u:
+                if not self.history or self.history[-1]['url'] != u:
+                    self.history.append({"title": browser.page().title(), "url": u})
+                    self.save_data()
+
+    def manage_bookmarks(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Bookmarks Manager")
+        dlg.setMinimumSize(450, 550)
+        layout = QVBoxLayout(dlg)
         
-        web.setUrl(url)
-        web.page().profile().downloadRequested.connect(self.handle_download)
+        list_w = QListWidget()
+        def reload_list():
+            list_w.clear()
+            for b in reversed(self.bookmarks): list_w.addItem(f"{b['title']} | {b['url']}")
         
-        def quick_safe(q_url):
-            u = q_url.toString()
-            if "google.com" in u and "safe=" not in u:
-                sep = "&" if "?" in u else "?"
-                web.blockSignals(True)
-                web.setUrl(QUrl(u + f"{sep}safe={self.safe_mode}"))
-                web.blockSignals(False)
+        reload_list()
+        
+        btns = QHBoxLayout()
+        add_btn = QPushButton("Save Current Page")
+        del_btn = QPushButton("Delete Selected")
+        clear_btn = QPushButton("Clear All")
+        
+        add_btn.clicked.connect(lambda: self.add_bookmark_logic(reload_list))
+        del_btn.clicked.connect(lambda: self.delete_bookmark_logic(list_w, reload_list))
+        clear_btn.clicked.connect(lambda: self.clear_bookmarks_logic(reload_list))
+        
+        list_w.itemDoubleClicked.connect(lambda i: [self.add_tab(QUrl(i.text().split(" | ")[-1]), "Loading..."), dlg.accept()])
 
-        web.urlChanged.connect(quick_safe)
-        idx = self.tabs.addTab(web, title)
-        self.tabs.setCurrentIndex(idx)
-        web.urlChanged.connect(lambda q: self.update_url_bar(q, web))
-        web.titleChanged.connect(lambda t: self.update_tab_title(t, web))
-        web.loadFinished.connect(lambda: self.log_history(web))
+        btns.addWidget(add_btn); btns.addWidget(del_btn); btns.addWidget(clear_btn)
+        layout.addWidget(list_w); layout.addLayout(btns)
+        dlg.exec()
 
-    def log_history(self, web):
-        url = web.url().toString()
-        if url and "home.html" not in url:
-            self.history.append({"title": web.title(), "url": url})
-            self.save_json(HISTORY_FILE, self.history)
+    def add_bookmark_logic(self, callback):
+        b = self.tabs.currentWidget()
+        url = b.url().toString()
+        if "home.html" not in url:
+            self.bookmarks.append({"title": b.page().title(), "url": url})
+            self.save_data(); callback()
 
-    def handle_download(self, d):
-        path, _ = QFileDialog.getSaveFileName(self, "Save File", d.suggestedFileName())
-        if path:
-            d.setDownloadDirectory(os.path.dirname(path)); d.setDownloadFileName(os.path.basename(path)); d.accept()
+    def delete_bookmark_logic(self, list_w, callback):
+        for item in list_w.selectedItems():
+            url = item.text().split(" | ")[-1]
+            self.bookmarks = [b for b in self.bookmarks if b['url'] != url]
+        self.save_data(); callback()
 
-    def update_url_bar(self, q, web):
-        if web == self.current(): self.url_bar.setText("" if "home.html" in q.toString() else q.toString())
+    def clear_bookmarks_logic(self, callback):
+        if QMessageBox.question(self, "Clear", "Clear all bookmarks?") == QMessageBox.Yes:
+            self.bookmarks = []; self.save_data(); callback()
 
-    def update_tab_title(self, t, web):
-        idx = self.tabs.indexOf(web)
-        if idx != -1: self.tabs.setTabText(idx, t[:15])
+    def manage_history(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("History Manager")
+        dlg.setMinimumSize(450, 550)
+        layout = QVBoxLayout(dlg)
+        list_w = QListWidget()
+        
+        def reload_list():
+            list_w.clear()
+            for h in reversed(self.history): list_w.addItem(f"{h['title']} | {h['url']}")
+        
+        reload_list()
+        
+        btns = QHBoxLayout()
+        del_btn = QPushButton("Delete Selected")
+        clear_btn = QPushButton("Clear All History")
+        
+        del_btn.clicked.connect(lambda: self.delete_history_logic(list_w, reload_list))
+        clear_btn.clicked.connect(lambda: self.clear_history_logic(reload_list))
+        
+        list_w.itemDoubleClicked.connect(lambda i: [self.add_tab(QUrl(i.text().split(" | ")[-1]), "Loading..."), dlg.accept()])
 
-    def close_tab(self, idx):
-        if self.tabs.count() > 1: self.tabs.removeTab(idx)
+        btns.addWidget(del_btn); btns.addWidget(clear_btn)
+        layout.addWidget(list_w); layout.addLayout(btns)
+        dlg.exec()
 
-    def current(self): return self.tabs.currentWidget()
-    def current_back(self): self.current().back()
-    def current_forward(self): self.current().forward()
-    def current_reload(self): self.current().reload()
-    def go_home(self): self.current().setUrl(self.home_url)
+    def delete_history_logic(self, list_w, callback):
+        for item in list_w.selectedItems():
+            url = item.text().split(" | ")[-1]
+            self.history = [h for h in self.history if h['url'] != url]
+        self.save_data(); callback()
 
-    def add_bookmark(self):
-        self.bookmarks.append({"title": self.current().title(), "url": self.current().url().toString()})
-        self.save_json(BOOKMARKS_FILE, self.bookmarks)
-        QMessageBox.information(self, "Saved", "Added to Bookmarks!")
+    def clear_history_logic(self, callback):
+        if QMessageBox.question(self, "Clear", "Clear all browsing history?") == QMessageBox.Yes:
+            self.history = []; self.save_data(); callback()
 
-    def load_json(self, f, default):
-        if os.path.exists(f):
-            try:
-                with open(f, "r", encoding="utf-8") as file: return json.load(file)
-            except: pass
-        return default
+    def open_settings(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Settings")
+        dlg.setFixedSize(400, 480)
+        layout = QVBoxLayout(dlg)
 
-    def save_json(self, f, d):
-        with open(f, "w", encoding="utf-8") as file: json.dump(d, file, indent=4)
+        layout.addWidget(QLabel("🔒 SECURITY ACCESS"))
+        p_btn = QPushButton("Set Password")
+        p_btn.clicked.connect(self.set_pwd)
+        r_btn = QPushButton("Remove Password")
+        r_btn.clicked.connect(self.rem_pwd)
+        layout.addWidget(p_btn); layout.addWidget(r_btn)
+
+        layout.addWidget(QLabel("\n🛡 GOOGLE SAFESEARCH"))
+        group = QButtonGroup(dlg)
+        r1 = QRadioButton("Filter (Strict Content)"); r2 = QRadioButton("Blur (Blur Sensitive)"); r3 = QRadioButton("Off (No Filtering)")
+        group.addButton(r1); group.addButton(r2); group.addButton(r3)
+        
+        if self.safesearch_mode == "active": r1.setChecked(True)
+        elif self.safesearch_mode == "images": r2.setChecked(True)
+        else: r3.setChecked(True)
+        
+        layout.addWidget(r1); layout.addWidget(r2); layout.addWidget(r3)
+        
+        save = QPushButton("APPLY ALL SETTINGS")
+        save.setStyleSheet("background: #00f2ff; color: #000;")
+        save.clicked.connect(lambda: self.apply_set(dlg, r1, r2, r3))
+        layout.addWidget(save)
+        dlg.exec()
+
+    def apply_set(self, dlg, r1, r2, r3):
+        if r1.isChecked(): self.safesearch_mode = "active"
+        elif r2.isChecked(): self.safesearch_mode = "images"
+        else: self.safesearch_mode = "off"
+        self.save_data(); dlg.accept()
+
+    def set_pwd(self):
+        p, ok = QInputDialog.getText(self, "Security", "Set New Password:", QLineEdit.Password)
+        if ok and p: self.app_password = p; self.save_data()
+
+    def rem_pwd(self): self.app_password = ""; self.save_data()
+
+    def close_tab(self, i):
+        if self.tabs.count() > 1: self.tabs.removeTab(i)
+        else: self.go_home()
+
+    def back(self): self.tabs.currentWidget().back()
+    def forward(self): self.tabs.currentWidget().forward()
+    def reload(self): self.tabs.currentWidget().reload()
+    def go_home(self): self.tabs.currentWidget().setUrl(self.home_url)
+
+class LoginDialog(QDialog):
+    def __init__(self, pwd):
+        super().__init__()
+        self.pwd = pwd
+        self.setWindowTitle("Security Lock")
+        self.setFixedSize(320, 160)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setStyleSheet("background: #050505; border: 2px solid #00f2ff; border-radius: 10px;")
+        l = QVBoxLayout(self)
+        title = QLabel("LOCKED: ACCESS DENIED")
+        title.setStyleSheet("color: #00f2ff; font-weight: bold; border: none;")
+        title.setAlignment(Qt.AlignCenter)
+        l.addWidget(title)
+        self.inp = QLineEdit()
+        self.inp.setEchoMode(QLineEdit.Password)
+        self.inp.setPlaceholderText("Enter Key to Unlock...")
+        self.inp.setStyleSheet("padding: 8px; color: white; background: #111; border: 1px solid #333;")
+        l.addWidget(self.inp)
+        b = QPushButton("UNLOCK BROWSER")
+        b.clicked.connect(self.check)
+        b.setStyleSheet("background: #00f2ff; color: #000; font-weight: bold;")
+        l.addWidget(b)
+
+    def check(self):
+        if self.inp.text() == self.pwd: self.accept()
+        else: QMessageBox.critical(self, "Denied", "Incorrect Password!")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = AdvancedBrowser()
+    
+    # Load Security State
+    temp_data = {}
+    if os.path.exists("gm_database_v3.json"):
+        with open("gm_database_v3.json", 'r') as f:
+            try: temp_data = json.load(f)
+            except: pass
+    
+    pwd = temp_data.get("password", "")
+    if pwd:
+        login = LoginDialog(pwd)
+        if login.exec() != QDialog.Accepted: sys.exit()
+    
+    window = GMBROWSER()
     window.show()
     sys.exit(app.exec())
+    
