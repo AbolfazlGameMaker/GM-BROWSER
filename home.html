@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GM-Home</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap');
+
+        :root {
+            --primary: #00ffff;
+            --accent: #ff00ff;
+            --bg: #080a0f;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Themes */
+        .theme-purple { --primary: #bf5af2; --accent: #ff2d55; }
+        .theme-green { --primary: #30d158; --accent: #00ffff; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            transition: 0.5s ease;
+        }
+
+        /* Background Animated Blobs */
+        .blob {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            filter: blur(100px);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0.12;
+            animation: move 25s infinite alternate;
+        }
+
+        @keyframes move {
+            from { transform: translate(-20%, -20%) rotate(0deg); }
+            to { transform: translate(20%, 20%) rotate(360deg); }
+        }
+
+        h1 {
+            font-size: 80px;
+            font-weight: 900;
+            margin-bottom: 30px;
+            letter-spacing: -3px;
+            background: linear-gradient(to right, #fff, var(--primary), var(--accent), #fff);
+            background-size: 200% auto;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 5s linear infinite;
+        }
+
+        @keyframes shine { to { background-position: 200% center; } }
+
+        /* Advanced Search Bar */
+        .search-container {
+            width: 100%;
+            max-width: 650px;
+            margin-bottom: 50px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 22px 40px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            color: white;
+            font-size: 20px;
+            outline: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.25), inset 0 0 10px rgba(0, 255, 255, 0.05);
+        }
+
+        /* Speed Dial Cards */
+        .container { display: flex; gap: 25px; margin-bottom: 50px; }
+        
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--border);
+            padding: 18px 45px;
+            border-radius: 25px;
+            text-decoration: none;
+            color: white;
+            font-weight: 600;
+            transition: 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            border-color: var(--primary);
+            box-shadow: 0 15px 35px rgba(0, 255, 255, 0.15);
+            color: var(--primary);
+        }
+
+        /* Downloads Section Ultra */
+        .downloads-section {
+            width: 480px;
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(40px);
+            padding: 25px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            animation: fadeIn 1s ease-out;
+        }
+
+        .downloads-title {
+            font-size: 12px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .download-item {
+            font-size: 13px;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.3s;
+        }
+
+        .download-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+
+        .download-name { font-weight: 400; color: #ddd; }
+        .download-date { color: #555; font-size: 11px; }
+
+        /* Theme Toggle */
+        #theme-btn {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+            z-index: 100;
+        }
+
+        #theme-btn:hover { background: var(--primary); color: #000; transform: rotate(45deg); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body id="main-body">
+
+    <button id="theme-btn" onclick="toggleTheme()">🎨</button>
+    <div class="blob"></div>
+
+    <h1>GM-BROWSER</h1>
+
+    <div class="search-container">
+        <form action="https://www.google.com/search" method="get" class="search-box">
+            <input type="text" name="q" placeholder="Type to explore the universe..." autocomplete="off">
+        </form>
+    </div>
+
+    <div class="container">
+        <a href="https://www.google.com" class="card">Google</a>
+        <a href="https://www.youtube.com" class="card">YouTube</a>
+        <a href="https://www.github.com" class="card">GitHub</a>
+    </div>
+
+    <div class="downloads-section" id="dw-section">
+        <div class="downloads-title">Recent Downloads</div>
+        <div id="downloads-list">
+            </div>
+    </div>
+
+    <script>
+        // Theme Switcher Logic
+        let currentTheme = 0;
+        const themes = ['', 'theme-purple', 'theme-green'];
+        function toggleTheme() {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.className = themes[currentTheme];
+        }
+
+        // Downloads Logic
+        async function loadDownloads() {
+            try {
+                const response = await fetch('downloads.json');
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                const list = document.getElementById('downloads-list');
+                list.innerHTML = '';
+                
+                if (data.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:10px; color:#444; font-size:12px;">No recent history</div>';
+                } else {
+                    data.forEach(item => {
+                        list.innerHTML += `
+                            <div class="download-item">
+                                <span class="download-name">📁 ${item.name}</span>
+                                <span class="download-date">${item.date}</span>
+                            </div>`;
+                    });
+                }
+            } catch (e) {
+                // If file doesn't exist yet, show a placeholder
+                document.getElementById('downloads-list').innerHTML = '<div style="text-align:center; padding:10px; color:#444; font-size:12px;">Waiting for activity...</div>';
+            }
+        }
+
+        loadDownloads();
+        setInterval(loadDownloads, 5000);
+    </script>
+</body>
+</html>
