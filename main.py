@@ -1,248 +1,284 @@
-import sys, os, json
+import sys
+import os
+import ctypes
+
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QLineEdit, QToolBar, QTabWidget, 
-    QWidget, QVBoxLayout, QDialog, QPushButton, QLabel, 
-    QRadioButton, QFrame, QListWidget, QMessageBox, QHBoxLayout,
-    QProgressBar, QMenu
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QToolBar, QLineEdit, QPushButton, QTabWidget, 
+    QProgressBar, QGraphicsDropShadowEffect, QFileDialog
 )
+
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
-from PySide6.QtGui import QColor, QKeyEvent, QAction, QIcon
-from PySide6.QtCore import QUrl, Qt, QSize
+from PySide6.QtWebEngineCore import (
+    QWebEnginePage, QWebEngineProfile, QWebEngineSettings,
+    QWebEngineDownloadRequest, QWebEngineUrlRequestInterceptor
+)
 
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--ignore-gpu-blocklist --no-sandbox"
+from PySide6.QtCore import QUrl, Qt
+from PySide6.QtGui import QColor, QPalette, QIcon, QAction, QKeySequence
 
-STYLE = """
-QMainWindow { background-color: #050505; }
-QToolBar { background: #080808; border-bottom: 1px solid #1a1a1a; padding: 5px; spacing: 10px; }
-QLineEdit { background: #111; color: #00f2ff; border: 1px solid #222; padding: 7px 15px; border-radius: 20px; font-size: 13px; }
-QPushButton { background: transparent; color: #777; font-size: 14px; padding: 5px; font-weight: bold; border-radius: 5px; }
-QPushButton:hover { color: #00f2ff; background: #1a1a1a; }
-QProgressBar { border: none; background: #050505; height: 2px; }
-QProgressBar::chunk { background-color: #00f2ff; }
-QTabWidget::pane { border: none; }
-QTabBar::tab { background: #080808; color: #444; padding: 10px 25px; border-right: 1px solid #111; }
-QTabBar::tab:selected { background: #111; color: #00f2ff; border-top: 2px solid #00f2ff; }
-QDialog { background: #080808; border: 1px solid #333; color: white; }
-QListWidget { background: #0a0a0a; color: #eee; border: 1px solid #222; border-radius: 5px; padding: 5px; }
-"""
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller/EXE """
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-class GMBrowser(QMainWindow):
+# ================== AD-BLOCKER ENGINE ==================
+class AdBlocker(QWebEngineUrlRequestInterceptor):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("GM-BROWSER")
-        self.resize(1200, 800)
-        self.setStyleSheet(STYLE)
-        
-        self.safe_mode = "active" 
-        self.is_fullscreen = False
-        self.home_path = resource_path("home.html")
-        self.home_url = QUrl.fromLocalFile(self.home_path)
-        
-        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        self.bookmarks_file = os.path.join(exe_dir, "bookmarks.json")
-        self.history_file = os.path.join(exe_dir, "history.json")
+        self.enabled = True  # Default status: ON
 
-        self.bookmarks = self.load_data(self.bookmarks_file)
-        self.history = self.load_data(self.history_file)
+    def interceptRequest(self, info):
+        if not self.enabled:
+            return
+            
+        url = info.requestUrl().toString()
+        # Blacklist of common ad domains
+        ad_filters = [
+            "doubleclick.net", "google-analytics.com", "adservice.google",
+            "popads.net", "adform.net", "adbrn.com", "pixel.facebook.com"
+        ]
+        if any(filter in url for filter in ad_filters):
+            info.block(True)
+
+# ================== CONFIG ==================
+APP_NAME = "GM-BROWSER"
+UI_ACCENT = "#00ff88"
+APP_ID = "com.gm.browser.ultimate.2025"
+
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+except:
+    pass
+
+# ================== BROWSER ENGINE ==================
+class BrowserEngine(QWebEnginePage):
+    def __init__(self, profile, parent=None):
+        super().__init__(profile, parent)
+        self.setBackgroundColor(QColor(5, 5, 5))
         
-        # UI Elements
+        s = self.settings()
+        s.setAttribute(QWebEngineSettings.LocalStorageEnabled, True)
+        s.setAttribute(QWebEngineSettings.ScrollAnimatorEnabled, True)
+        s.setAttribute(QWebEngineSettings.DnsPrefetchEnabled, True)
+        s.setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
+        s.setAttribute(QWebEngineSettings.FocusOnNavigationEnabled, True)
+
+# ================== MAIN INTERFACE ==================
+class GMBrowserNexus(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        
+        # Initialize Ad-Blocker on the default profile
+        self.ad_blocker = AdBlocker()
+        QWebEngineProfile.defaultProfile().setUrlRequestInterceptor(self.ad_blocker)
+        
+        self.root_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        self.home_url = os.path.join(self.root_dir, "home.html")
+        self.icon_url = os.path.join(self.root_dir, "logo.ico")
+        
+        self.setWindowTitle(APP_NAME)
+        self.resize(1400, 900)
+        if os.path.exists(self.icon_url):
+            self.setWindowIcon(QIcon(self.icon_url))
+            
+        self.setup_ui_nexus()
+        self.add_new_tab()
+        self.setup_shortcuts()
+
+    def setup_ui_nexus(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- TOOLBAR ---
+        self.toolbar = QToolBar()
+        self.toolbar.setMovable(False)
+        self.toolbar.setStyleSheet(f"""
+            QToolBar {{
+                background: #050505;
+                border-bottom: 1px solid #111;
+                padding: 10px 20px;
+                spacing: 15px;
+            }}
+            QPushButton {{
+                background: transparent;
+                color: #666;
+                border: none;
+                font-size: 20px;
+            }}
+            QPushButton:hover {{
+                color: {UI_ACCENT};
+            }}
+        """)
+
+        self.toolbar.addWidget(self.create_nav_btn("←", self.go_back))
+        self.toolbar.addWidget(self.create_nav_btn("→", self.go_forward))
+        self.toolbar.addWidget(self.create_nav_btn("↻", self.reload_page))
+        self.toolbar.addWidget(self.create_nav_btn("⌂", self.go_home))
+        
+        self.address_bar = QLineEdit()
+        self.address_bar.setPlaceholderText("Search or enter URL...")
+        self.address_bar.returnPressed.connect(self.navigate_to_input)
+        self.address_bar.setStyleSheet(f"""
+            QLineEdit {{
+                background: #0d0d0d;
+                color: #fff;
+                border: 1px solid #222;
+                border-radius: 10px;
+                padding: 8px 15px;
+            }}
+            QLineEdit:focus {{ border-color: {UI_ACCENT}; }}
+        """)
+        self.toolbar.addWidget(self.address_bar)
+
+        # Ad-block control button
+        self.ad_btn = self.create_nav_btn("🛡️", self.toggle_adblock)
+        self.ad_btn.setStyleSheet(f"color: {UI_ACCENT}; font-size: 18px;") # Default: Green (Enabled)
+        self.toolbar.addWidget(self.ad_btn)
+
+        self.toolbar.addWidget(self.create_nav_btn("+", self.add_new_tab))
+        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
+
+        self.progress_line = QProgressBar()
+        self.progress_line.setFixedHeight(2)
+        self.progress_line.setTextVisible(False)
+        self.progress_line.setStyleSheet(f"QProgressBar {{ background: transparent; border: none; }} QProgressBar::chunk {{ background: {UI_ACCENT}; }}")
+        main_layout.addWidget(self.progress_line)
+
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
-        self.tabs.setMovable(True)
+        self.tabs.setDocumentMode(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
-        self.setCentralWidget(self.tabs)
-        
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMaximum(100)
-        self.progress_bar.setTextVisible(False)
-        
-        self.setup_ui()
-        self.add_new_tab(self.home_url, "GM-BROWSER")
+        self.tabs.currentChanged.connect(self.sync_address_bar)
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border: none; background: #000; }}
+            QTabBar::tab {{
+                background: #050505; color: #444;
+                padding: 12px 25px; min-width: 150px;
+                border: none;
+            }}
+            QTabBar::tab:selected {{ 
+                background: #0a0a0a; color: {UI_ACCENT}; 
+                border-bottom: 2px solid {UI_ACCENT};
+            }}
+        """)
+        main_layout.addWidget(self.tabs)
 
-    def load_data(self, filename):
-        if os.path.exists(filename):
-            try:
-                with open(filename, 'r', encoding='utf-8') as f: return json.load(f)
-            except: return []
-        return []
+    def toggle_adblock(self):
+        self.ad_blocker.enabled = not self.ad_blocker.enabled
+        if self.ad_blocker.enabled:
+            self.ad_btn.setStyleSheet(f"color: {UI_ACCENT}; font-size: 18px;")
+            self.ad_btn.setText("🛡️")
+        else:
+            self.ad_btn.setStyleSheet("color: #ff4444; font-size: 18px;")
+            self.ad_btn.setText("🔓")
 
-    def save_data(self, filename, data):
-        with open(filename, 'w', encoding='utf-8') as f: json.dump(data, f, indent=4)
-
-    def setup_ui(self):
-        self.toolbar = QToolBar()
-        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
-        self.toolbar.setMovable(False)
+    def setup_shortcuts(self):
+        # Navigation and Tab shortcuts
+        self._add_action("Ctrl+T", self.add_new_tab)
+        self._add_action("Ctrl+W", lambda: self.close_tab(self.tabs.currentIndex()))
+        self._add_action("F11", self.toggle_fullscreen)
+        self._add_action("Ctrl+B", self.toggle_adblock) # Ad-block toggle shortcut
         
-        self.toolbar.addWidget(self.create_nav_btn("🏠", self.go_home))
-        self.toolbar.addWidget(self.create_nav_btn("❮", lambda: self.tabs.currentWidget().back()))
-        self.toolbar.addWidget(self.create_nav_btn("❯", lambda: self.tabs.currentWidget().forward()))
-        self.toolbar.addWidget(self.create_nav_btn("↻", lambda: self.tabs.currentWidget().reload()))
-        
-        self.url_bar = QLineEdit()
-        self.url_bar.setPlaceholderText("Search or enter URL...")
-        self.url_bar.returnPressed.connect(self.navigate)
-        self.toolbar.addWidget(self.url_bar)
-        
-        self.toolbar.addWidget(self.create_nav_btn("⭐", self.add_bookmark))
-        self.toolbar.addWidget(self.create_nav_btn("📜", self.show_history_dialog))
-        self.toolbar.addWidget(self.create_nav_btn("➕", lambda: self.add_new_tab(self.home_url, "New Tab")))
-        self.toolbar.addWidget(self.create_nav_btn("⚙️", self.open_settings))
+        # Zoom shortcuts
+        self._add_action("Ctrl+=", self.zoom_in)
+        self._add_action("Ctrl+-", self.zoom_out)
+        self._add_action("Ctrl+0", self.zoom_reset)
 
-        # Bottom UI layout for progress bar
-        layout = QVBoxLayout()
-        container = QWidget()
-        container.setLayout(layout)
-        layout.setContentsMargins(0,0,0,0)
-        layout.setSpacing(0)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.tabs)
-        self.setCentralWidget(container)
+    def _add_action(self, shortcut, slot):
+        action = QAction(self)
+        action.setShortcut(QKeySequence(shortcut))
+        action.triggered.connect(slot)
+        self.addAction(action)
 
-    def create_nav_btn(self, text, slot):
-        btn = QPushButton(text)
-        btn.setMinimumWidth(30)
+    def zoom_in(self):
+        current_view = self.tabs.currentWidget()
+        if current_view: current_view.setZoomFactor(current_view.zoomFactor() + 0.1)
+
+    def zoom_out(self):
+        current_view = self.tabs.currentWidget()
+        if current_view: current_view.setZoomFactor(max(0.25, current_view.zoomFactor() - 0.1))
+
+    def zoom_reset(self):
+        current_view = self.tabs.currentWidget()
+        if current_view: current_view.setZoomFactor(1.0)
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+            self.toolbar.show()
+        else:
+            self.showFullScreen()
+            self.toolbar.hide()
+
+    def create_nav_btn(self, icon, slot):
+        btn = QPushButton(icon)
+        btn.setFixedSize(40, 40)
         btn.clicked.connect(slot)
         return btn
 
-    def add_new_tab(self, qurl, title):
-        browser = QWebEngineView()
-        browser.settings().setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
-        browser.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
-        browser.setUrl(qurl)
-        
-        idx = self.tabs.addTab(browser, title)
+    def add_new_tab(self, qurl=None):
+        view = QWebEngineView()
+        view.setZoomFactor(1.0)
+        profile = QWebEngineProfile.defaultProfile()
+        profile.downloadRequested.connect(self.handle_download)
+        page = BrowserEngine(profile, view)
+        view.setPage(page)
+        view.loadProgress.connect(self.progress_line.setValue)
+        view.urlChanged.connect(self.sync_address_bar)
+        view.titleChanged.connect(lambda t: self.update_tab_title(view, t))
+        if qurl: view.setUrl(qurl)
+        elif os.path.exists(self.home_url): view.setUrl(QUrl.fromLocalFile(self.home_url))
+        else: view.setUrl(QUrl("https://www.google.com"))
+        idx = self.tabs.addTab(view, "New Tab")
         self.tabs.setCurrentIndex(idx)
-        
-        # Signals
-        browser.urlChanged.connect(lambda q: self.handle_url_change(q, browser))
-        browser.titleChanged.connect(lambda t: self.tabs.setTabText(self.tabs.indexOf(browser), t[:15]))
-        browser.loadProgress.connect(self.progress_bar.setValue)
-        browser.loadFinished.connect(lambda: self.progress_bar.setValue(0))
-        
-        # Download support
-        browser.page().profile().downloadRequested.connect(self.handle_download)
-        
-        # Custom Context Menu
-        browser.setContextMenuPolicy(Qt.CustomContextMenu)
-        browser.customContextMenuRequested.connect(lambda pos: self.show_context_menu(pos, browser))
 
-    def handle_download(self, download_item):
-        path = os.path.join(os.path.expanduser("~"), "Downloads", download_item.suggestedFileName())
-        download_item.setDownloadDirectory(os.path.dirname(path))
-        download_item.setDownloadFileName(os.path.basename(path))
-        download_item.accept()
-        download_item.finished.connect(lambda: QMessageBox.information(self, "Success", "Download Finished!"))
-
-    def show_context_menu(self, pos, browser):
-        menu = QMenu(self)
-        back_action = QAction("Back", self)
-        back_action.triggered.connect(browser.back)
-        menu.addAction(back_action)
-        
-        reload_action = QAction("Reload", self)
-        reload_action.triggered.connect(browser.reload)
-        menu.addAction(reload_action)
-        
-        menu.addSeparator()
-        copy_action = QAction("Copy Link", self)
-        menu.addAction(copy_action)
-        
-        menu.exec(browser.mapToGlobal(pos))
-
-    def handle_url_change(self, q, browser):
-        url_str = q.toString()
-        if "home.html" not in url_str:
-            self.url_bar.setText(url_str)
-            if not self.history or self.history[-1]['url'] != url_str:
-                self.history.append({"title": browser.title() or "Page", "url": url_str})
-                self.save_data(self.history_file, self.history)
-        else:
-            self.url_bar.clear()
-
-    def navigate(self):
-        text = self.url_bar.text().strip()
-        if not text: return
-        if "." in text and " " not in text:
-            url = text if "://" in text else "https://" + text
-        else:
-            url = f"https://www.google.com/search?q={text}&safe={self.safe_mode}"
-        self.tabs.currentWidget().setUrl(QUrl(url))
-
-    def go_home(self):
-        self.tabs.currentWidget().setUrl(self.home_url)
+    def update_tab_title(self, view, title):
+        idx = self.tabs.indexOf(view)
+        if idx != -1: self.tabs.setTabText(idx, (title[:15] + "..") if len(title) > 15 else title)
 
     def close_tab(self, i):
         if self.tabs.count() > 1:
+            w = self.tabs.widget(i)
             self.tabs.removeTab(i)
-        else:
-            self.go_home()
+            w.deleteLater()
+        else: self.close()
 
-    def add_bookmark(self):
+    def navigate_to_input(self):
+        text = self.address_bar.text().strip()
+        if not text: return
+        url = text if "." in text and " " not in text else f"https://www.google.com/search?q={text}"
+        if "://" not in url: url = "https://" + url
+        self.tabs.currentWidget().setUrl(QUrl(url))
+
+    def sync_address_bar(self):
         curr = self.tabs.currentWidget()
-        url = curr.url().toString()
-        if "home.html" not in url:
-            if not any(b['url'] == url for b in self.bookmarks):
-                self.bookmarks.append({"title": curr.title() or "Page", "url": url})
-                self.save_data(self.bookmarks_file, self.bookmarks)
-                QMessageBox.information(self, "Saved", "Added to Bookmarks.")
+        if curr:
+            url_str = curr.url().toString()
+            self.address_bar.setText("" if "home.html" in url_str else url_str)
 
-    def show_history_dialog(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("History")
-        dlg.setFixedSize(500, 400)
-        layout = QVBoxLayout(dlg)
-        list_w = QListWidget()
-        for h in reversed(self.history): list_w.addItem(h['url'])
-        layout.addWidget(list_w)
-        btn_clear = QPushButton("Clear All")
-        btn_clear.clicked.connect(lambda: [self.history.clear(), self.save_data(self.history_file, []), list_w.clear()])
-        layout.addWidget(btn_clear)
-        list_w.itemDoubleClicked.connect(lambda it: [self.tabs.currentWidget().setUrl(QUrl(it.text())), dlg.accept()])
-        dlg.exec()
+    def handle_download(self, download: QWebEngineDownloadRequest):
+        path, _ = QFileDialog.getSaveFileName(self, "Save File", download.downloadFileName())
+        if path:
+            download.setDownloadDirectory(os.path.dirname(path))
+            download.setDownloadFileName(os.path.basename(path))
+            download.accept()
 
-    def open_settings(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Settings")
-        layout = QVBoxLayout(dlg)
-        lbl = QLabel("Safe Search Mode:")
-        layout.addWidget(lbl)
-        self.r_off = QRadioButton("Off")
-        self.r_on = QRadioButton("Strict")
-        layout.addWidget(self.r_off)
-        layout.addWidget(self.r_on)
-        if self.safe_mode == "active": self.r_on.setChecked(True)
-        else: self.r_off.setChecked(True)
-        btn = QPushButton("Apply")
-        btn.clicked.connect(lambda: self.apply_set(dlg))
-        layout.addWidget(btn)
-        dlg.exec()
+    def go_back(self): self.tabs.currentWidget().back()
+    def go_forward(self): self.tabs.currentWidget().forward()
+    def reload_page(self): self.tabs.currentWidget().reload()
+    def go_home(self):
+        if os.path.exists(self.home_url):
+            self.tabs.currentWidget().setUrl(QUrl.fromLocalFile(self.home_url))
 
-    def apply_set(self, dlg):
-        self.safe_mode = "active" if self.r_on.isChecked() else "off"
-        dlg.accept()
-
-    def keyPressEvent(self, e):
-        if e.key() == Qt.Key_F11:
-            if self.is_fullscreen: self.showNormal()
-            else: self.showFullScreen()
-            self.is_fullscreen = not self.is_fullscreen
-        elif e.key() == Qt.Key_T and e.modifiers() & Qt.ControlModifier:
-            self.add_new_tab(self.home_url, "New Tab")
-
+# ================== RUN ==================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setApplicationName("GM-BROWSER")
-    window = GMBrowser()
-    window.show()
+    app.setStyle("Fusion")
+    p = QPalette()
+    p.setColor(QPalette.Window, QColor(0, 0, 0))
+    p.setColor(QPalette.Base, QColor(5, 5, 5))
+    p.setColor(QPalette.Text, Qt.white)
+    app.setPalette(p)
+    browser = GMBrowserNexus()
+    browser.show()
     sys.exit(app.exec())
     

@@ -2,52 +2,245 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GM-BROWSER</title>
+    <title>GM-BROWSER | Future Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Inter:wght@300;500&display=swap" rel="stylesheet">
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@100;300;400;600&display=swap');
-        :root { --primary: #00f2ff; --bg: #020202; --glow: rgba(0, 242, 255, 0.4); }
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body { background-color: var(--bg); color: white; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; font-family: 'Outfit', sans-serif; }
-        .universe-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #0a0a20 0%, #000 100%); z-index: -3; }
-        .stars-layer { position: absolute; width: 200%; height: 200%; background-image: radial-gradient(1px 1px at 20px 30px, #fff, rgba(0,0,0,0)), radial-gradient(1.5px 1.5px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(2px 2px at 50px 160px, var(--primary), rgba(0,0,0,0)); background-repeat: repeat; background-size: 250px 250px; animation: rotateStars 180s linear infinite; opacity: 0.4; z-index: -2; }
-        @keyframes rotateStars { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .nebula-glow { position: absolute; width: 100vw; height: 100vh; background: radial-gradient(circle at 20% 30%, rgba(112, 0, 255, 0.15) 0%, transparent 45%), radial-gradient(circle at 80% 70%, rgba(0, 242, 255, 0.15) 0%, transparent 45%); filter: blur(120px); z-index: -1; }
-        .brand-box { position: relative; text-align: center; z-index: 10; }
-        .main-logo { font-family: 'Orbitron', sans-serif; font-size: clamp(60px, 12vw, 120px); font-weight: 900; letter-spacing: 15px; text-transform: uppercase; background: linear-gradient(to bottom, #ffffff 20%, #444444 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 35px var(--glow)); margin-bottom: 10px; animation: logoPulse 5s ease-in-out infinite; }
-        @keyframes logoPulse { 0%, 100% { filter: drop-shadow(0 0 30px var(--glow)); transform: scale(1); } 50% { filter: drop-shadow(0 0 60px var(--primary)); transform: scale(1.03); } }
-        .tagline { font-size: 14px; letter-spacing: 12px; color: var(--primary); text-transform: uppercase; opacity: 0.7; margin-bottom: 50px; }
-        .cosmos-clock { position: absolute; bottom: 80px; padding: 25px 50px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(0, 242, 255, 0.2); backdrop-filter: blur(15px); border-radius: 100px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
-        #time-text { font-family: 'Orbitron', sans-serif; font-size: 50px; font-weight: 700; color: #fff; text-shadow: 0 0 20px var(--primary); letter-spacing: 5px; }
-        #date-text { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 6px; margin-top: 8px; text-align: center; }
-        .scan-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity: 0.15; box-shadow: 0 0 20px var(--primary); animation: scanning 10s linear infinite; }
-        @keyframes scanning { 0% { top: -10%; } 100% { top: 110%; } }
+        :root {
+            --accent: #00ff88;
+            --bg: #020202;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.08);
+            --glow: rgba(0, 255, 136, 0.4);
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            cursor: default;
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% -20%, #0a2015 0%, transparent 50%),
+                radial-gradient(circle at center, #050505 0%, #020202 100%);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', sans-serif;
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .main-shell {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 700px;
+            text-align: center;
+            animation: slideUp 1.2s cubic-bezier(0.2, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(30px, 5vw, 50px);
+            font-weight: 900;
+            letter-spacing: 15px;
+            margin-bottom: 50px;
+            background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.5) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.2));
+            text-transform: uppercase;
+        }
+
+        .logo span {
+            color: var(--accent);
+            -webkit-text-fill-color: var(--accent);
+            text-shadow: 0 0 20px var(--glow);
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .search-container input {
+            width: 100%;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 22px 35px;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 18px;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+            outline: none;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 1px;
+            cursor: text;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .search-container input:focus {
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.1), inset 0 0 10px rgba(0, 255, 136, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .search-container input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 3px;
+        }
+
+        .shortcuts {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .shortcut-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 12px 25px;
+            border-radius: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            cursor: pointer;
+        }
+
+        .shortcut-card:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0, 255, 136, 0.05);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        footer {
+            position: fixed;
+            bottom: 30px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            letter-spacing: 6px;
+            color: rgba(255, 255, 255, 0.15);
+            text-transform: uppercase;
+            width: 100%;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div class="universe-bg"></div>
-    <div class="stars-layer"></div>
-    <div class="nebula-glow"></div>
-    <div class="scan-line"></div>
-    <div class="brand-box">
-        <h1 class="main-logo">GM-BROWSER</h1>
-        <p class="tagline">The Ultimate Web Experience</p>
+
+    <canvas id="particles"></canvas>
+
+    <div class="main-shell">
+        <h1 class="logo">GM-<span>BROWSER</span></h1>
+
+        <form onsubmit="doSearch(event)" class="search-container">
+            <input type="text" id="sInput" placeholder="Initialize Search Protocol" autocomplete="off">
+        </form>
+
+        <nav class="shortcuts">
+            <a href="https://google.com" class="shortcut-card">Google</a>
+            <a href="https://youtube.com" class="shortcut-card">YouTube</a>
+            <a href="https://github.com" class="shortcut-card">GitHub</a>
+            <a href="https://openai.com" class="shortcut-card">AI-Lab</a>
+        </nav>
     </div>
-    <div class="cosmos-clock">
-        <div id="time-text">00:00:00</div>
-        <div id="date-text">COSMOS CALENDAR</div>
-    </div>
+
+    <footer>&copy; 2025 GM-BROWSER Nexus Protocol</footer>
+
     <script>
-        function updateCosmosEngine() {
-            const now = new Date();
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('time-text').innerText = `${h}:${m}:${s}`;
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('date-text').innerText = now.toLocaleDateString('en-US', options);
+        // Intelligent Search Engine
+        function doSearch(e) {
+            e.preventDefault();
+            const input = document.getElementById('sInput');
+            const query = input.value.trim();
+            if(!query) return;
+
+            // Visual feedback on submit
+            input.style.borderColor = '#00ff88';
+            input.style.opacity = '0.5';
+
+            setTimeout(() => {
+                if(query.includes('.') && !query.includes(' ')) {
+                    window.location.href = query.startsWith('http') ? query : 'https://' + query;
+                } else {
+                    window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+                }
+            }, 300);
         }
-        setInterval(updateCosmosEngine, 1000);
-        updateCosmosEngine();
+
+        // Advanced Particle Background (Interactive)
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            particles = [];
+            const count = Math.floor(window.innerWidth / 20); // Responsive count
+            for(let i=0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 1.5 + 0.5,
+                    speed: Math.random() * 0.5 + 0.2,
+                    opacity: Math.random() * 0.5 + 0.1
+                });
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                ctx.fillStyle = `rgba(0, 255, 136, ${p.opacity})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                p.y -= p.speed;
+                if(p.y < -10) p.y = canvas.height + 10;
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+        animate();
     </script>
 </body>
 </html>
