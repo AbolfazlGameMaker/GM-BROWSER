@@ -3,13 +3,13 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QToolBar, QLineEdit,
     QPushButton, QTabWidget, QProgressBar, QFileDialog
 )
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QFont, QFontDatabase, QColor, QPalette
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import (
     QWebEnginePage, QWebEngineProfile, QWebEngineSettings,
     QWebEngineUrlRequestInterceptor, QWebEngineDownloadRequest
 )
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QAction, QIcon, QKeySequence, QFont, QFontDatabase, QColor, QPalette
+from PySide6.QtCore import QUrl, Qt
 
 APP_NAME = "GM-BROWSER"
 APP_ID = "com.gm.browser.ultimate.2025"
@@ -56,7 +56,6 @@ class GMBrowser(QMainWindow):
         self.root_dir = os.path.dirname(os.path.abspath(__file__))
         self.home_path = os.path.join(self.root_dir, "home.html")
         self.icon_path = os.path.join(self.root_dir, "logo.ico")
-        self.bookmarks = []
 
         self.setWindowTitle(APP_NAME)
         self.resize(1400,900)
@@ -91,6 +90,7 @@ class GMBrowser(QMainWindow):
         act = QAction(self)
         act.setShortcut(QKeySequence(key))
         act.triggered.connect(slot)
+        act.setShortcutContext(Qt.ApplicationShortcut)
         self.addAction(act)
 
     def toggle_fullscreen(self):
@@ -114,13 +114,9 @@ class GMBrowser(QMainWindow):
             download.setDownloadFileName(os.path.basename(path))
             download.accept()
 
-    def add_bookmark(self):
-        url = self.tabs.currentWidget().url().toString()
-        if url not in self.bookmarks:
-            self.bookmarks.append(url)
-
-    def show_bookmarks(self):
-        print("Bookmarks:", self.bookmarks)
+    # --- BOOKMARK SYSTEM REMOVED ---
+    # def add_bookmark(self): pass
+    # def show_bookmarks(self): pass
 
     def _build_ui(self):
         central = QWidget(self)
@@ -153,7 +149,8 @@ class GMBrowser(QMainWindow):
         self.ad_btn = self._nav_btn("🛡", self.toggle_adblock)
         self.toolbar.addWidget(self.ad_btn)
         self.toolbar.addWidget(self._nav_btn("+", self.add_tab))
-        self.toolbar.addWidget(self._nav_btn("★", self.add_bookmark))
+        # --- BOOKMARK BUTTON REMOVED ---
+        # self.toolbar.addWidget(self._nav_btn("★", self.add_bookmark))
         self.addToolBar(self.toolbar)
 
         self.progress = QProgressBar()
@@ -175,7 +172,7 @@ class GMBrowser(QMainWindow):
         layout.addWidget(self.progress)
         layout.addWidget(self.tabs)
 
-    def add_tab(self, url=None):
+    def add_tab(self, url: str = None):
         view = QWebEngineView()
         view.setPage(BrowserPage(self.profile, view))
         view.loadProgress.connect(self.progress.setValue)
@@ -183,7 +180,7 @@ class GMBrowser(QMainWindow):
         view.titleChanged.connect(lambda t: self._update_tab_title(view, t))
         self.profile.downloadRequested.connect(self.handle_download)
 
-        if url is None:
+        if not url or not isinstance(url, str):
             view.setUrl(QUrl.fromLocalFile(self.home_path))
         else:
             view.setUrl(QUrl(url))
@@ -219,14 +216,13 @@ class GMBrowser(QMainWindow):
                 self.address_bar.setText(url)
 
     def _setup_shortcuts(self):
-        self._bind("Ctrl+T", self.add_tab)
+        self._bind("Ctrl+T", lambda: self.add_tab())
         self._bind("Ctrl+W", lambda: self.close_tab(self.tabs.currentIndex()))
         self._bind("F11", self.toggle_fullscreen)
         self._bind("Ctrl+R", self.reload_page)
         self._bind("Ctrl+L", lambda: self.address_bar.setFocus())
-        self._bind("Ctrl+B", self.show_bookmarks)  # Show bookmarks with Ctrl+B
-
-# ---------------- END OF BROWSER CLASS ----------------
+        # --- BOOKMARK SHORTCUT REMOVED ---
+        # self._bind("Ctrl+B", self.show_bookmarks)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
