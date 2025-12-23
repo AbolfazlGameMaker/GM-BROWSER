@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <title>GM-BROWSER</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Google Fonts: Inter & Montserrat -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700&display=swap" rel="stylesheet">
 <link rel="icon" href="logo.ico" type="image/x-icon">
 
@@ -13,202 +11,86 @@
 :root{
     --accent:#ffd700;
     --accent-soft:rgba(255,215,0,.3);
-    --accent-glow:rgba(255,215,0,.12);
-    --bg:#010202;
+    --accent-glow:rgba(255,215,0,.18);
+    --bg:#0a0b0c;
     --glass:rgba(255,255,255,.05);
     --border:rgba(255,255,255,.14);
 }
+/* RESET */
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+body{height:100vh;overflow:hidden;background:var(--bg);color:#fff;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;}
 
-/* RESET & NON-COPYABLE */
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    user-select:none; /* everything non-copyable */
-}
-
-/* GLOBAL TEXT */
-body{
-    height:100vh;
-    overflow:hidden;
-    background:var(--bg);
-    color:#fff;
-    font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    line-height:1.5;
-}
-
-/* BACKGROUND NEBULA */
+/* NEBULA */
 .nebula{
-    position:fixed;
-    inset:-50%;
+    position:fixed;inset:-50%;
     background:
         radial-gradient(circle at 15% 20%, var(--accent-soft) 0%, transparent 50%),
         radial-gradient(circle at 80% 30%, #00aaff22 0%, transparent 50%),
         radial-gradient(circle at 50% 75%, #7cff3322 0%, transparent 50%);
-    filter:blur(180px);
-    animation:nebula 60s ease-in-out infinite alternate;
+    filter:blur(220px);
+    animation:nebula 90s ease-in-out infinite alternate;
     z-index:0;
 }
-@keyframes nebula{
-    from{transform:translateY(-5%) rotate(0deg)}
-    to{transform:translateY(5%) rotate(12deg)}
-}
+@keyframes nebula{from{transform:translateY(-7%) rotate(0deg)}to{transform:translateY(7%) rotate(18deg)}}
 
 /* STARFIELD */
-canvas{
-    position:fixed;
-    inset:0;
-    z-index:1;
-    opacity:.6;
-}
+canvas{position:fixed;inset:0;z-index:1;opacity:.7;}
 
 /* HALO */
-.halo{
-    position:absolute;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    pointer-events:none;
-    z-index:2;
-}
-.halo svg{
-    width:540px;
-    height:540px;
-    opacity:.2;
-    animation:spin 180s linear infinite;
-    stroke:var(--accent-soft);
-}
-@keyframes spin{
-    to{transform:rotate(360deg)}
-}
+.halo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2;}
+.halo svg{width:640px;height:640px;opacity:.22;animation:spin 220s linear infinite;stroke:var(--accent-soft);}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* MAIN SHELL */
-.shell{
-    position:relative;
-    z-index:5;
-    height:100%;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    text-align:center;
-    gap:24px;
-}
+/* SHELL */
+.shell{position:relative;z-index:5;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:30px;}
 
 /* LOGO */
-.logo{
-    font-family:'Montserrat', sans-serif;
-    font-size:clamp(56px,8vw,88px);
-    letter-spacing:18px;
-    font-weight:700;
-    color:#fff;
-    text-shadow:
-        0 0 24px var(--accent-glow),
-        0 0 48px rgba(255,215,0,.2),
-        0 0 120px rgba(255,215,0,.15);
-}
+.logo{font-family:'Montserrat', sans-serif;font-size:clamp(64px,10vw,100px);letter-spacing:22px;font-weight:700;color:#fff;text-shadow:0 0 28px var(--accent-glow),0 0 68px rgba(255,215,0,.28),0 0 150px rgba(255,215,0,.2);}
+.logo span{color:var(--accent);text-shadow:0 0 36px var(--accent-glow),0 0 72px var(--accent-soft);}
 
 /* SEARCH */
-.search{
-    width:min(92%,760px);
-    position:relative;
-}
+.search{width:min(92%,820px);position:relative;}
 .search input{
-    width:100%;
-    padding:28px 40px;
-    border-radius:36px;
-    border:1px solid var(--border);
-    background:var(--glass);
-    backdrop-filter:blur(24px);
-    color:white;
-    font-size:18px;
-    text-align:center;
-    outline:none;
-    transition:.5s ease, transform .3s ease;
-    box-shadow:0 10px 36px rgba(0,0,0,.25);
+    width:100%;padding:30px 44px;border-radius:44px;border:1px solid var(--border);
+    background:var(--glass);backdrop-filter:blur(28px);
+    color:white;font-size:18px;text-align:center;outline:none;
+    transition:.5s ease, transform .3s ease, box-shadow .5s ease;
+    box-shadow:0 16px 52px rgba(0,0,0,.32);
     font-family:'Inter', sans-serif;
-    user-select:text; /* input text selectable */
 }
-.search input::placeholder{
-    color:rgba(255,255,255,.35);
-    letter-spacing:3px;
-    font-size:14px;
-    font-weight:500;
-}
+.search input::placeholder{color:rgba(255,255,255,.38);letter-spacing:3px;font-size:15px;font-weight:500;}
 .search input:focus{
     border-color:var(--accent);
-    box-shadow:
-        0 0 0 1px var(--accent),
-        0 0 100px var(--accent-soft),
-        0 0 200px rgba(255,215,0,.08);
-    transform:translateY(-2px) scale(1.02);
+    box-shadow:0 0 0 1px var(--accent),0 0 160px var(--accent-soft),0 0 300px rgba(255,215,0,.08);
+    transform:translateY(-3px) scale(1.03);
 }
 
 /* SHORTCUTS */
-.shortcuts{
-    display:flex;
-    gap:28px;
-    flex-wrap:wrap;
-    justify-content:center;
-}
+.shortcuts{display:flex;gap:36px;flex-wrap:wrap;justify-content:center;z-index:5;}
 .shortcut{
-    padding:18px 40px;
-    border-radius:24px;
-    background:var(--glass);
-    border:1px solid var(--border);
-    backdrop-filter:blur(20px);
-    font-size:14px;
-    letter-spacing:1.5px;
-    text-decoration:none;
-    color:rgba(255,255,255,.85);
-    transition:.35s ease, transform .3s ease;
-    box-shadow:0 10px 36px rgba(0,0,0,.25);
-    font-family:'Inter', sans-serif;
-    font-weight:500;
-    user-select:none; /* non-copyable */
+    padding:20px 50px;border-radius:30px;background:var(--glass);border:1px solid var(--border);
+    backdrop-filter:blur(24px);font-size:15px;letter-spacing:1.5px;text-decoration:none;color:rgba(255,255,255,.88);
+    transition:.35s ease, transform .3s ease, box-shadow .35s ease;box-shadow:0 14px 44px rgba(0,0,0,.3);
+    font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;
 }
 .shortcut:hover{
-    color:var(--accent);
-    border-color:var(--accent);
-    background:rgba(255,215,0,.1);
-    transform:translateY(-6px) scale(1.05);
-    box-shadow:0 28px 64px rgba(255,215,0,.22);
+    color:var(--accent);border-color:var(--accent);background:rgba(255,215,0,.12);
+    transform:translateY(-7px) scale(1.08);box-shadow:0 36px 80px rgba(255,215,0,.25);
 }
 
 /* ORBS */
-.orb{
-    position:absolute;
-    width:300px;
-    height:300px;
-    border-radius:50%;
-    background:radial-gradient(circle,var(--accent),transparent 65%);
-    filter:blur(90px);
-    opacity:.28;
-    animation:float 18s ease-in-out infinite alternate;
-}
-.orb.one{top:12%;left:10%}
-.orb.two{bottom:14%;right:16%;animation-duration:22s}
-@keyframes float{
-    from{transform:translateY(0)}
-    to{transform:translateY(-65px)}
-}
+.orb{position:absolute;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,var(--accent),transparent 65%);filter:blur(110px);opacity:.35;animation:float 22s ease-in-out infinite alternate;}
+.orb.one{top:10%;left:8%}.orb.two{bottom:12%;right:14%;animation-duration:28s;}.orb.three{top:25%;right:10%;animation-duration:32s;}
+@keyframes float{from{transform:translateY(0)}to{transform:translateY(-85px)}}
 
 /* FOOTER */
-footer{
-    position:absolute;
-    bottom:28px;
-    font-size:13px;
-    letter-spacing:3px;
-    color:rgba(255,255,255,.22);
-    text-shadow:0 0 6px rgba(255,215,0,.12);
-}
+footer{position:absolute;bottom:28px;font-size:14px;letter-spacing:3px;color:rgba(255,255,255,.25);text-shadow:0 0 8px rgba(255,215,0,.12);}
 
 /* RESPONSIVE */
 @media(max-width:600px){
-    .logo{letter-spacing:12px; font-size:clamp(40px,9vw,64px);}
-    .search input{padding:20px 28px; font-size:16px;}
-    .shortcut{padding:14px 28px;font-size:13px;}
+    .logo{letter-spacing:16px;font-size:clamp(48px,11vw,72px);}
+    .search input{padding:24px 32px;font-size:17px;}
+    .shortcut{padding:18px 36px;font-size:14px;}
 }
 </style>
 </head>
@@ -219,6 +101,7 @@ footer{
 
 <div class="orb one"></div>
 <div class="orb two"></div>
+<div class="orb three"></div>
 
 <div class="halo">
 <svg viewBox="0 0 200 200">
@@ -235,10 +118,11 @@ footer{
     </form>
 
     <div class="shortcuts">
-        <a class="shortcut" href="https://google.com">Google</a>
-        <a class="shortcut" href="https://youtube.com">YouTube</a>
-        <a class="shortcut" href="https://github.com">GitHub</a>
-        <a class="shortcut" href="https://openai.com">OpenAI</a>
+        <a class="shortcut" href="#" data-url="https://google.com">Google</a>
+        <a class="shortcut" href="#" data-url="https://youtube.com">YouTube</a>
+        <a class="shortcut" href="#" data-url="https://github.com">GitHub</a>
+        <a class="shortcut" href="#" data-url="https://openai.com">OpenAI</a>
+        <a class="shortcut" href="#" data-url="https://twitter.com">Twitter</a>
     </div>
 </div>
 
@@ -254,17 +138,25 @@ function go(e){
         :"https://google.com/search?q="+encodeURIComponent(q);
 }
 
+/* Shortcut links fixed */
+document.querySelectorAll('.shortcut').forEach(a=>{
+    a.addEventListener('click', e=>{
+        e.preventDefault();
+        const url=a.getAttribute('data-url');
+        if(url) location.href = url;
+    });
+});
+
 /* STARFIELD */
 const c=document.getElementById("stars"),x=c.getContext("2d");
 let s=[];
 function resize(){
-    c.width=innerWidth;
-    c.height=innerHeight;
-    s=Array.from({length:innerWidth/12},()=>({
+    c.width=innerWidth;c.height=innerHeight;
+    s=Array.from({length:Math.floor(innerWidth/9)},()=>({
         x:Math.random()*c.width,
         y:Math.random()*c.height,
-        z:Math.random()*1.6+.4,
-        v:Math.random()*.4+.15
+        z:Math.random()*2.2+.6,
+        v:Math.random()*.55+.25
     }));
 }
 function draw(){

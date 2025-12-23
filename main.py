@@ -1,15 +1,15 @@
-import sys, os, ctypes
+import sys, os, ctypes, webbrowser
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QToolBar, QLineEdit,
-    QPushButton, QTabWidget, QProgressBar, QFileDialog
+    QPushButton, QTabWidget, QProgressBar, QFileDialog, QMenu, QStatusBar
 )
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QFont, QFontDatabase, QColor, QPalette
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import (
     QWebEnginePage, QWebEngineProfile, QWebEngineSettings,
-    QWebEngineUrlRequestInterceptor, QWebEngineDownloadRequest
+    QWebEngineUrlRequestInterceptor, QWebEngineDownloadRequest, QWebEngineUrlRequestInfo
 )
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QUrl, Qt, QTimer
 
 APP_NAME = "GM-BROWSER"
 APP_ID = "com.gm.browser.ultimate.2025"
@@ -35,9 +35,12 @@ class AdBlocker(QWebEngineUrlRequestInterceptor):
     def __init__(self):
         super().__init__()
         self.enabled = True
-    def interceptRequest(self, info):
-        if self.enabled and any(ad in info.requestUrl().toString() for ad in self.BLOCK_LIST):
-            info.block(True)
+    def interceptRequest(self, info: QWebEngineUrlRequestInfo):
+        try:
+            if self.enabled and any(ad in info.requestUrl().toString() for ad in self.BLOCK_LIST):
+                info.block(True)
+        except Exception:
+            pass
 
 class BrowserPage(QWebEnginePage):
     def __init__(self, profile, parent=None):
@@ -49,6 +52,10 @@ class BrowserPage(QWebEnginePage):
         s.setAttribute(QWebEngineSettings.DnsPrefetchEnabled, True)
         s.setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
         s.setAttribute(QWebEngineSettings.FocusOnNavigationEnabled, True)
+        s.setAttribute(QWebEngineSettings.PluginsEnabled, True)
+        s.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        s.setAttribute(QWebEngineSettings.JavascriptCanOpenWindows, True)
+        s.setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False)
 
 class GMBrowser(QMainWindow):
     def __init__(self):
@@ -65,20 +72,27 @@ class GMBrowser(QMainWindow):
         self.profile = QWebEngineProfile.defaultProfile()
         self.ad_blocker = AdBlocker()
         self.profile.setUrlRequestInterceptor(self.ad_blocker)
+        self.profile.downloadRequested.connect(self.handle_download)
 
         self._build_ui()
         self._setup_shortcuts()
         self.add_tab()
+        self.auto_refresh_timer = QTimer()
+        self.auto_refresh_timer.timeout.connect(self.reload_current_tab)
+        self.auto_refresh_timer.start(300000)
 
     def _update_tab_title(self, view, title):
         idx = self.tabs.indexOf(view)
         if idx != -1:
             self.tabs.setTabText(idx, title[:18]+"…" if len(title) > 18 else title)
+        self.status.showMessage(title,3000)
 
-    def _nav_btn(self, text, slot):
+    def _nav_btn(self, text, slot, tooltip=None):
         btn = QPushButton(text)
         btn.setFixedSize(36,36)
         btn.clicked.connect(slot)
+        if tooltip:
+            btn.setToolTip(tooltip)
         btn.setStyleSheet(f"QPushButton {{ background:transparent; color:#bbb; border:none; font-size:16px }} QPushButton:hover {{ color:{UI_ACCENT} }}")
         return btn
 
@@ -99,7 +113,7 @@ class GMBrowser(QMainWindow):
             self.toolbar.show()
         else:
             self.showFullScreen()
-            self.toolbar.show()  # Keep toolbar visible in fullscreen
+            self.toolbar.show()
 
     def go_back(self): self.tabs.currentWidget().back()
     def go_forward(self): self.tabs.currentWidget().forward()
@@ -107,16 +121,25 @@ class GMBrowser(QMainWindow):
     def go_home(self):
         self.tabs.currentWidget().setUrl(QUrl.fromLocalFile(self.home_path))
 
-    def handle_download(self, download: QWebEngineDownloadRequest):
-        path,_ = QFileDialog.getSaveFileName(self, "Save File", download.downloadFileName())
-        if path:
-            download.setDownloadDirectory(os.path.dirname(path))
-            download.setDownloadFileName(os.path.basename(path))
-            download.accept()
+    def stop_loading(self):
+        self.tabs.currentWidget().stop()
 
-    # --- BOOKMARK SYSTEM REMOVED ---
-    # def add_bookmark(self): pass
-    # def show_bookmarks(self): pass
+    def reload_current_tab(self):
+        self.tabs.currentWidget().reload()
+
+    def reload_all_tabs(self):
+        for i in range(self.tabs.count()):
+            self.tabs.widget(i).reload()
+
+    def handle_download(self, download: QWebEngineDownloadRequest):
+        try:
+            path,_ = QFileDialog.getSaveFileName(self, "Save File", download.downloadFileName())
+            if path:
+                download.setDownloadDirectory(os.path.dirname(path))
+                download.setDownloadFileName(os.path.basename(path))
+                download.accept()
+        except Exception:
+            download.cancel()
 
     def _build_ui(self):
         central = QWidget(self)
@@ -129,8 +152,8 @@ class GMBrowser(QMainWindow):
         self.toolbar.setMovable(False)
         self.toolbar.setFixedHeight(60)
         self.toolbar.setStyleSheet(f"QToolBar {{ background:#121212; border-bottom:1px solid #333; padding:4px 12px; spacing:8px }}")
-        for txt, slot in [("←",self.go_back),("→",self.go_forward),("↻",self.reload_page),("⌂",self.go_home)]:
-            self.toolbar.addWidget(self._nav_btn(txt,slot))
+        for txt, slot in [("←",self.go_back),("→",self.go_forward),("↻",self.reload_page),("■",self.stop_loading),("⌂",self.go_home)]:
+            self.toolbar.addWidget(self._nav_btn(txt,slot,""))
 
         self.address_bar = QLineEdit()
         self.address_bar.setPlaceholderText("Search with Google or enter address")
@@ -146,11 +169,12 @@ class GMBrowser(QMainWindow):
         """)
         self.toolbar.addWidget(self.address_bar)
 
-        self.ad_btn = self._nav_btn("🛡", self.toggle_adblock)
+        self.ad_btn = self._nav_btn("🛡", self.toggle_adblock,"Toggle AdBlock")
         self.toolbar.addWidget(self.ad_btn)
+        self.tab_count_btn = self._nav_btn("0", lambda: None,"Tab Count")
+        self.toolbar.addWidget(self.tab_count_btn)
         self.toolbar.addWidget(self._nav_btn("+", self.add_tab))
-        # --- BOOKMARK BUTTON REMOVED ---
-        # self.toolbar.addWidget(self._nav_btn("★", self.add_bookmark))
+        self.toolbar.addWidget(self._nav_btn("⟳", self.reload_all_tabs,"Refresh All Tabs"))
         self.addToolBar(self.toolbar)
 
         self.progress = QProgressBar()
@@ -163,6 +187,8 @@ class GMBrowser(QMainWindow):
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.currentChanged.connect(self.sync_address)
+        self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabs.customContextMenuRequested.connect(self.tab_context_menu)
         self.tabs.setStyleSheet(f"""
             QTabBar::tab {{ background:#1e1e1e; color:#ccc; padding:8px 20px; min-width:120px }}
             QTabBar::tab:selected {{ background:#2a2a2a; color:{UI_ACCENT}; border-bottom:2px solid {UI_ACCENT} }}
@@ -172,13 +198,22 @@ class GMBrowser(QMainWindow):
         layout.addWidget(self.progress)
         layout.addWidget(self.tabs)
 
+        self.status = QStatusBar()
+        self.setStatusBar(self.status)
+
+    def tab_context_menu(self, pos):
+        menu = QMenu()
+        menu.addAction("Back", self.go_back)
+        menu.addAction("Forward", self.go_forward)
+        menu.addAction("Reload", self.reload_page)
+        menu.exec_(self.tabs.mapToGlobal(pos))
+
     def add_tab(self, url: str = None):
         view = QWebEngineView()
         view.setPage(BrowserPage(self.profile, view))
         view.loadProgress.connect(self.progress.setValue)
         view.urlChanged.connect(self.sync_address)
         view.titleChanged.connect(lambda t: self._update_tab_title(view, t))
-        self.profile.downloadRequested.connect(self.handle_download)
 
         if not url or not isinstance(url, str):
             view.setUrl(QUrl.fromLocalFile(self.home_path))
@@ -187,6 +222,7 @@ class GMBrowser(QMainWindow):
 
         index = self.tabs.addTab(view, "New Tab")
         self.tabs.setCurrentIndex(index)
+        self.update_tab_count()
 
     def close_tab(self, index):
         if self.tabs.count() > 1:
@@ -194,15 +230,17 @@ class GMBrowser(QMainWindow):
             self.tabs.removeTab(index)
         else:
             self.close()
+        self.update_tab_count()
+
+    def update_tab_count(self):
+        self.tab_count_btn.setText(str(self.tabs.count()))
 
     def navigate(self):
         text = self.address_bar.text().strip()
-        if not text: return
-        if text.lower() == "home":
-            url = QUrl.fromLocalFile(self.home_path)
-        elif "://" in text:
-            url = QUrl(text)
-        else:
+        if not text:
+            return
+        url = QUrl.fromUserInput(text)
+        if not url.isValid() or url.isEmpty():
             url = QUrl(f"https://www.google.com/search?q={text}")
         self.tabs.currentWidget().setUrl(url)
 
@@ -221,8 +259,6 @@ class GMBrowser(QMainWindow):
         self._bind("F11", self.toggle_fullscreen)
         self._bind("Ctrl+R", self.reload_page)
         self._bind("Ctrl+L", lambda: self.address_bar.setFocus())
-        # --- BOOKMARK SHORTCUT REMOVED ---
-        # self._bind("Ctrl+B", self.show_bookmarks)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -235,5 +271,6 @@ if __name__ == "__main__":
     app.setPalette(palette)
 
     browser = GMBrowser()
+    # Browser fully loaded and ready
     browser.show()
     sys.exit(app.exec())
