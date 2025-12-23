@@ -1,246 +1,287 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>GM-BROWSER | Future Interface</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Inter:wght@300;500&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<title>GM-BROWSER</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        :root {
-            --accent: #00ff88;
-            --bg: #020202;
-            --glass: rgba(255, 255, 255, 0.03);
-            --border: rgba(255, 255, 255, 0.08);
-            --glow: rgba(0, 255, 136, 0.4);
-        }
+<!-- Google Fonts: Inter & Montserrat -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+<link rel="icon" href="logo.ico" type="image/x-icon">
 
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
-            cursor: default;
-            user-select: none; 
-            -webkit-user-select: none;
-        }
+<style>
+:root{
+    --accent:#ffd700;
+    --accent-soft:rgba(255,215,0,.3);
+    --accent-glow:rgba(255,215,0,.12);
+    --bg:#010202;
+    --glass:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.14);
+}
 
-        body {
-            background-color: var(--bg);
-            background-image: 
-                radial-gradient(circle at 50% -20%, #0a2015 0%, transparent 50%),
-                radial-gradient(circle at center, #050505 0%, #020202 100%);
-            color: white;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Inter', sans-serif;
-        }
+/* RESET & NON-COPYABLE */
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    user-select:none; /* everything non-copyable */
+}
 
-        canvas {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            opacity: 0.6;
-            pointer-events: none;
-        }
+/* GLOBAL TEXT */
+body{
+    height:100vh;
+    overflow:hidden;
+    background:var(--bg);
+    color:#fff;
+    font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5;
+}
 
-        .main-shell {
-            position: relative;
-            z-index: 10;
-            width: 90%;
-            max-width: 700px;
-            text-align: center;
-            animation: slideUp 1.2s cubic-bezier(0.2, 1, 0.3, 1);
-        }
+/* BACKGROUND NEBULA */
+.nebula{
+    position:fixed;
+    inset:-50%;
+    background:
+        radial-gradient(circle at 15% 20%, var(--accent-soft) 0%, transparent 50%),
+        radial-gradient(circle at 80% 30%, #00aaff22 0%, transparent 50%),
+        radial-gradient(circle at 50% 75%, #7cff3322 0%, transparent 50%);
+    filter:blur(180px);
+    animation:nebula 60s ease-in-out infinite alternate;
+    z-index:0;
+}
+@keyframes nebula{
+    from{transform:translateY(-5%) rotate(0deg)}
+    to{transform:translateY(5%) rotate(12deg)}
+}
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
+/* STARFIELD */
+canvas{
+    position:fixed;
+    inset:0;
+    z-index:1;
+    opacity:.6;
+}
 
-        .logo {
-            font-family: 'Orbitron', sans-serif;
-            font-size: clamp(30px, 5vw, 50px);
-            font-weight: 900;
-            letter-spacing: 15px;
-            margin-bottom: 50px;
-            background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.5) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.2));
-            text-transform: uppercase;
-        }
+/* HALO */
+.halo{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:2;
+}
+.halo svg{
+    width:540px;
+    height:540px;
+    opacity:.2;
+    animation:spin 180s linear infinite;
+    stroke:var(--accent-soft);
+}
+@keyframes spin{
+    to{transform:rotate(360deg)}
+}
 
-        .logo span {
-            color: var(--accent);
-            -webkit-text-fill-color: var(--accent);
-            text-shadow: 0 0 20px var(--glow);
-        }
+/* MAIN SHELL */
+.shell{
+    position:relative;
+    z-index:5;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    gap:24px;
+}
 
-        .search-container {
-            position: relative;
-            margin-bottom: 50px;
-            backdrop-filter: blur(10px);
-        }
+/* LOGO */
+.logo{
+    font-family:'Montserrat', sans-serif;
+    font-size:clamp(56px,8vw,88px);
+    letter-spacing:18px;
+    font-weight:700;
+    color:#fff;
+    text-shadow:
+        0 0 24px var(--accent-glow),
+        0 0 48px rgba(255,215,0,.2),
+        0 0 120px rgba(255,215,0,.15);
+}
 
-        .search-container input {
-            width: 100%;
-            background: var(--glass);
-            border: 1px solid var(--border);
-            padding: 22px 35px;
-            border-radius: 20px;
-            color: #fff;
-            font-size: 18px;
-            font-family: 'Inter', sans-serif;
-            text-align: center;
-            outline: none;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            letter-spacing: 1px;
-            cursor: text;
-            user-select: text;
-            -webkit-user-select: text;
-        }
+/* SEARCH */
+.search{
+    width:min(92%,760px);
+    position:relative;
+}
+.search input{
+    width:100%;
+    padding:28px 40px;
+    border-radius:36px;
+    border:1px solid var(--border);
+    background:var(--glass);
+    backdrop-filter:blur(24px);
+    color:white;
+    font-size:18px;
+    text-align:center;
+    outline:none;
+    transition:.5s ease, transform .3s ease;
+    box-shadow:0 10px 36px rgba(0,0,0,.25);
+    font-family:'Inter', sans-serif;
+    user-select:text; /* input text selectable */
+}
+.search input::placeholder{
+    color:rgba(255,255,255,.35);
+    letter-spacing:3px;
+    font-size:14px;
+    font-weight:500;
+}
+.search input:focus{
+    border-color:var(--accent);
+    box-shadow:
+        0 0 0 1px var(--accent),
+        0 0 100px var(--accent-soft),
+        0 0 200px rgba(255,215,0,.08);
+    transform:translateY(-2px) scale(1.02);
+}
 
-        .search-container input:focus {
-            border-color: var(--accent);
-            background: rgba(255, 255, 255, 0.05);
-            box-shadow: 0 0 40px rgba(0, 255, 136, 0.1), inset 0 0 10px rgba(0, 255, 136, 0.05);
-            transform: translateY(-2px);
-        }
+/* SHORTCUTS */
+.shortcuts{
+    display:flex;
+    gap:28px;
+    flex-wrap:wrap;
+    justify-content:center;
+}
+.shortcut{
+    padding:18px 40px;
+    border-radius:24px;
+    background:var(--glass);
+    border:1px solid var(--border);
+    backdrop-filter:blur(20px);
+    font-size:14px;
+    letter-spacing:1.5px;
+    text-decoration:none;
+    color:rgba(255,255,255,.85);
+    transition:.35s ease, transform .3s ease;
+    box-shadow:0 10px 36px rgba(0,0,0,.25);
+    font-family:'Inter', sans-serif;
+    font-weight:500;
+    user-select:none; /* non-copyable */
+}
+.shortcut:hover{
+    color:var(--accent);
+    border-color:var(--accent);
+    background:rgba(255,215,0,.1);
+    transform:translateY(-6px) scale(1.05);
+    box-shadow:0 28px 64px rgba(255,215,0,.22);
+}
 
-        .search-container input::placeholder {
-            color: rgba(255, 255, 255, 0.2);
-            text-transform: uppercase;
-            font-size: 14px;
-            letter-spacing: 3px;
-        }
+/* ORBS */
+.orb{
+    position:absolute;
+    width:300px;
+    height:300px;
+    border-radius:50%;
+    background:radial-gradient(circle,var(--accent),transparent 65%);
+    filter:blur(90px);
+    opacity:.28;
+    animation:float 18s ease-in-out infinite alternate;
+}
+.orb.one{top:12%;left:10%}
+.orb.two{bottom:14%;right:16%;animation-duration:22s}
+@keyframes float{
+    from{transform:translateY(0)}
+    to{transform:translateY(-65px)}
+}
 
-        .shortcuts {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
+/* FOOTER */
+footer{
+    position:absolute;
+    bottom:28px;
+    font-size:13px;
+    letter-spacing:3px;
+    color:rgba(255,255,255,.22);
+    text-shadow:0 0 6px rgba(255,215,0,.12);
+}
 
-        .shortcut-card {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            padding: 12px 25px;
-            border-radius: 12px;
-            color: rgba(255, 255, 255, 0.5);
-            text-decoration: none;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
-            letter-spacing: 2px;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
-            cursor: pointer;
-        }
-
-        .shortcut-card:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            background: rgba(0, 255, 136, 0.05);
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-        }
-
-        footer {
-            position: fixed;
-            bottom: 30px;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            letter-spacing: 6px;
-            color: rgba(255, 255, 255, 0.15);
-            text-transform: uppercase;
-            width: 100%;
-            text-align: center;
-        }
-    </style>
+/* RESPONSIVE */
+@media(max-width:600px){
+    .logo{letter-spacing:12px; font-size:clamp(40px,9vw,64px);}
+    .search input{padding:20px 28px; font-size:16px;}
+    .shortcut{padding:14px 28px;font-size:13px;}
+}
+</style>
 </head>
 <body>
 
-    <canvas id="particles"></canvas>
+<div class="nebula"></div>
+<canvas id="stars"></canvas>
 
-    <div class="main-shell">
-        <h1 class="logo">GM-<span>BROWSER</span></h1>
+<div class="orb one"></div>
+<div class="orb two"></div>
 
-        <form onsubmit="doSearch(event)" class="search-container">
-            <input type="text" id="sInput" placeholder="Initialize Search Protocol" autocomplete="off">
-        </form>
+<div class="halo">
+<svg viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="92" stroke-width="1" fill="none" stroke-dasharray="2 10"/>
+    <circle cx="100" cy="100" r="68" stroke-width="1" fill="none" stroke-dasharray="1 6"/>
+</svg>
+</div>
 
-        <nav class="shortcuts">
-            <a href="https://google.com" class="shortcut-card">Google</a>
-            <a href="https://youtube.com" class="shortcut-card">YouTube</a>
-            <a href="https://github.com" class="shortcut-card">GitHub</a>
-            <a href="https://openai.com" class="shortcut-card">AI-Lab</a>
-        </nav>
+<div class="shell">
+    <div class="logo">GM<span>-BROWSER</span></div>
+
+    <form class="search" onsubmit="go(event)">
+        <input id="q" placeholder="Search or enter address">
+    </form>
+
+    <div class="shortcuts">
+        <a class="shortcut" href="https://google.com">Google</a>
+        <a class="shortcut" href="https://youtube.com">YouTube</a>
+        <a class="shortcut" href="https://github.com">GitHub</a>
+        <a class="shortcut" href="https://openai.com">OpenAI</a>
     </div>
+</div>
 
-    <footer>&copy; 2025 GM-BROWSER Nexus Protocol</footer>
+<footer>© 2025 Golden Moon Studio. All rights reserved.</footer>
 
-    <script>
-        // Intelligent Search Engine
-        function doSearch(e) {
-            e.preventDefault();
-            const input = document.getElementById('sInput');
-            const query = input.value.trim();
-            if(!query) return;
+<script>
+function go(e){
+    e.preventDefault();
+    const q=document.getElementById("q").value.trim();
+    if(!q)return;
+    location.href=q.includes(".")&&!q.includes(" ")
+        ?(q.startsWith("http")?q:"https://"+q)
+        :"https://google.com/search?q="+encodeURIComponent(q);
+}
 
-            // Visual feedback on submit
-            input.style.borderColor = '#00ff88';
-            input.style.opacity = '0.5';
+/* STARFIELD */
+const c=document.getElementById("stars"),x=c.getContext("2d");
+let s=[];
+function resize(){
+    c.width=innerWidth;
+    c.height=innerHeight;
+    s=Array.from({length:innerWidth/12},()=>({
+        x:Math.random()*c.width,
+        y:Math.random()*c.height,
+        z:Math.random()*1.6+.4,
+        v:Math.random()*.4+.15
+    }));
+}
+function draw(){
+    x.clearRect(0,0,c.width,c.height);
+    s.forEach(a=>{
+        x.fillStyle=`rgba(255,255,255,${a.z*.35})`;
+        x.beginPath();
+        x.arc(a.x,a.y,a.z,0,Math.PI*2);
+        x.fill();
+        a.y+=a.v;
+        if(a.y>c.height)a.y=0;
+    });
+    requestAnimationFrame(draw);
+}
+addEventListener("resize",resize);
+resize();draw();
+</script>
 
-            setTimeout(() => {
-                if(query.includes('.') && !query.includes(' ')) {
-                    window.location.href = query.startsWith('http') ? query : 'https://' + query;
-                } else {
-                    window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
-                }
-            }, 300);
-        }
-
-        // Advanced Particle Background (Interactive)
-        const canvas = document.getElementById('particles');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
-
-        function init() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            particles = [];
-            const count = Math.floor(window.innerWidth / 20); // Responsive count
-            for(let i=0; i < count; i++) {
-                particles.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    size: Math.random() * 1.5 + 0.5,
-                    speed: Math.random() * 0.5 + 0.2,
-                    opacity: Math.random() * 0.5 + 0.1
-                });
-            }
-        }
-
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => {
-                ctx.fillStyle = `rgba(0, 255, 136, ${p.opacity})`;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-                
-                p.y -= p.speed;
-                if(p.y < -10) p.y = canvas.height + 10;
-            });
-            requestAnimationFrame(animate);
-        }
-
-        window.addEventListener('resize', init);
-        init();
-        animate();
-    </script>
 </body>
 </html>
